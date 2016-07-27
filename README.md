@@ -4,9 +4,9 @@
 
 webLauncher is a web server and supporting HTML, CSS, and javaScript files
 that are used to provide an app launcher as a web service.  You run
-webLauncher-server on a particular computer and then any web browser can
-launch programs on that computer.  The network connections are secured via
-TLS and the browser authenticates via passcode and cookies.
+webLauncher on a particular computer and then any web browser can launch
+programs on that computer.  The network connections are secured via TLS
+and the browser authenticates via passcode and cookies.
 
 
 ## Quick Install and Demo
