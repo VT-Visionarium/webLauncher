@@ -1,6 +1,6 @@
 # webLauncher
 
-a program launcher web service
+> a program launcher web service
 
 webLauncher is a web server and supporting HTML, CSS, and javaScript files
 that are used to provide an app launcher as a web service.  You run
@@ -13,20 +13,37 @@ TLS and the browser authenticates via passcode and cookies.
 
 ### Prerequisite Software
 
-nodejs  MORE HERE
+##### nodejs
+
+From https://nodejs.org/.  We are currently using a build from
+github source via git source repo with git tag v6.2.2
+So for example run:
+> git clone --branch v6.2.2 https://github.com/nodejs/node.git
+to get nodejs source with tag v6.2.2.
+
+#### For Development
+
+##### yui-compressor
 
 
-### Install
+### Build and Install
 
-Try running:
+run (bash):
 
-MORE HERE
+<pre>./configure && make && make install</pre>
 
 
-### Run Demo
+### Run a Demo
 
-MORE HERE
+run:
 
+<pre>
+make &&\
+./webLauncher testDocRoot/ &\
+# wait for the server to start\
+while ! nc -z  localhost 8080;do echo "waiting";sleep 0.3;done&&\
+firefox http://localhost:8080/
+</pre>
 
 ## Why
 
@@ -52,5 +69,31 @@ are using web browsers anyway, there's not a big cost to doing it this
 way.
 
 
+## Ports
 
+### Server Code
+
+The current development platform is GNU/Linux, Xubuntu 14.04.  We expect
+that other GNU/Linux systems should work.
+
+We plan to port to Windoz and Mac OSX.
+
+
+### Browsers
+
+The served HTML, CSS, and javaScript are ported to:
+currently firefox on Xubuntu.  We find that Chrome on an Android phone works too.
+
+
+## Developer Notes
+
+bootstrap
+> We are developing this code with the aid of a repository and we do not
+> check-in generated files into the repository.  Some files in a tar-ball
+> release are generated so we require that these files be generated via
+> the script 'bootstrap'.
+
+
+markdown
+> .md files in this pachage compile into HTML with markdown
 
