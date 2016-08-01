@@ -166,7 +166,10 @@ function usage() {
 "   Usage: " + prog + " [DOC_ROOT] [--exit-on-last] [--heading HEADING] [--kill-children]\\\n" +
 "        [--on-exit PROGRAM] [--passcode PASSCODE] [--signal SIG PID] [--title TITLE]\n" +
 "\n" +
-"  Run a " + prog + " HTTP server and WebSocket server.\n" +
+"  Run a " + prog + " HTTP/webSocket server.  \n" +
+"\n" +
+"  " + prog + " is a nodejs web server that provides a program launcher service using\n" +
+"  HTTP, HTTPS, Web Sockets and Web Sockets over TLS.\n" +
 "\n" +
 "  The default DOC_ROOT is the current working directory.\n" +
 "\n" +

@@ -39,10 +39,10 @@ run:
 
 <pre>
 make &&\
-./webLauncher testDocRoot/ &\
-# wait for the server to start\
-while ! nc -z  localhost 8080;do echo "waiting";sleep 0.3;done&&\
-firefox http://localhost:8080/
+ ./webLauncher testDocRoot/ &
+ # wait for the server to start
+ while ! nc -z  localhost 8080;do echo "waiting";sleep 0.3;done
+ firefox http://localhost:8080/
 </pre>
 
 ## Why
