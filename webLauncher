@@ -10,50 +10,13 @@ var
 
     defaultHeading = 'Demos',
 
-
-//////////////////////////////////////////////////////////////////////
-
-    https = require('https'),
-    http = require('http'),
-    child_process = require('child_process'),
-    dns = require('dns'),
-    url = require('url'),
-    path = require('path'),
-    fs = require('fs'),
-    util = require('util'),
-    ws = require('ws').Server,
     httpPort = 8080,
     httpsPort = 8383,
-    // We use a separate port for the web sockets
-    // so that the code has less chance of braking.
-    heading = '',
-    title = '',
-    signal = [],
     exitOnLast = false,
     killChildren = false,
     rootDir = '',
-    launcher = {},
-    sockets = {},
-    socketCreateCount = 0,
-    // clone the actual env vars to avoid overrides
-    env = Object.create(process.env),
-    querystring = require('querystring'),
     passcode = '',
     onExit = '',
-
-
-//////////////////////////////////////////////////////////////////////
-//         Supporting Files
-//////////////////////////////////////////////////////////////////////
-
-    // User configuration/setting dir
-    userDir = process.env.HOME + '/.webLauncher',
-
-    // Files in etc/ used to compose pages served
-    serverFiles = {
-        'head.htm': '', // Top of the page.
-        'foot.htm': ''  // Bottom of the page.
-    },
 
     // Filename of Launcher Scripts to link.
     runnerScriptFilenames = [
@@ -62,7 +25,7 @@ var
 
     // Filename of Program Description Files
     ///////////////////////////////////////
-    
+
     // For HTML fragment.  If found will not use
     // txtDescFilename
     htmDescFilename = 'description.htm',
@@ -82,11 +45,48 @@ var
 
 //////////////////////////////////////////////////////////////////////
 
+    // We use a separate port for the web sockets
+    // so that the code has less chance of braking.
+    heading = '',
+    title = '',
+    signal = [],
+    https = require('https'),
+    http = require('http'),
+    querystring = require('querystring'),
+    child_process = require('child_process'),
+    dns = require('dns'),
+    url = require('url'),
+    path = require('path'),
+    fs = require('fs'),
+    util = require('util'),
+    ws = require('ws').Server,
+    launcher = {},
+    sockets = {},
+    socketCreateCount = 0,
+    // clone the actual env vars to avoid overrides
+    env = Object.create(process.env),
+
+
+//////////////////////////////////////////////////////////////////////
+//         Supporting Files
+//////////////////////////////////////////////////////////////////////
+
+    // User configuration/setting dir
+    userDir = process.env.HOME + '/.webLauncher',
+
+    // Files in etc/ used to compose pages served
+    serverFiles = {
+        'head.htm': '', // Top of the page.
+        'foot.htm': ''  // Bottom of the page.
+    },
+
+
+
+//////////////////////////////////////////////////////////////////////
+
     scriptDir = path.dirname(fs.realpathSync(__filename)),
     cwdOrg = process.cwd(),
-    filenames = [],
-    etcDir = '',
-    requestRunCount = 0;
+    etcDir = '';
 
 //////////////////////////////////////////////////////////////////////
 
@@ -148,10 +148,12 @@ function exit(stat) {
 function ASSERT(x, msg) {
     if(x) return;
 
-    console.log('Assertion FAILED');
+    var txt = "Assertion(" + String(x) + ") FAILED";
 
     if(arguments.length > 1)
-        console.log(msg);
+        console.log(txt + "\n" + msg);
+    else
+        console.log(txt);
 
     throw('error'); // print stack trace??
     exit(1);
@@ -636,6 +638,7 @@ function config() {
     for(var i=2; i < process.argv.length; ++i) {
         var str = process.argv[i];
         // TODO: rewrite this switch mess!!!!
+        // This is still much less code than a generic option parser.
         switch(str) {
             case '-h':
             case '--h':
@@ -710,6 +713,8 @@ function config() {
                 if(str.match(/^-/))
                     usage();
                 try {
+                    // The default argument is the root document directory.
+                    // What better way to test that we can use it than cd to it.
                     process.chdir(str);
                 }
                 catch(err) {
