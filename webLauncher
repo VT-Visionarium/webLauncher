@@ -1,9 +1,187 @@
 #!/usr/local/bin/node
 
 //////////////////////////////////////////////////////////////////////
-//         App option defaults
+//         user configurable options
 //////////////////////////////////////////////////////////////////////
 
+// options can be set via default, command line, config file, and
+// environment variable
+
+// Refactoring user configurable options
+// note "default" is a javaScript keyword so we use dflt
+// default argument is object name in caps like
+// --http_port=HTTP_PORT
+
+
+var path = require('path');
+
+var environment_prefix = 'WEB_LAUNCHER_';
+var program_name = 'webLauncher';
+
+var usage_text = 'Run a ' + program_name + ' HTTP/webSocket server. ' +
+        program_name +
+        ' is a nodejs web server that provides a program launcher' +
+        ' service using HTTP, HTTPS, Web Sockets and Web Sockets' +
+        ' over TLS.';
+
+// Convert string to regexp and vise-versa
+function convertStringRegex(x) {
+    if(typeof(x) === 'string')
+        // convert to regexp
+        return new RegExp(str);
+    // else convert to string
+    return x.toString();
+}
+
+function usage() {
+
+    console.log('Usage: ' + program_name + " [OPTIONS]\n\n" +
+            usage_text + " \n\n" +
+            "                   OPTIONS\n\n");
+    
+    var keys = Object.keys(options);
+    for(var i=0; i<keys.length; ++i) {
+
+        var opt = options[keys[i]];
+
+       console.log(keys[i] + '  ' + opt.help + "\n\n");
+    }
+
+    process.exit(1);
+}
+
+function parseOptions() {
+
+    for(var i=2; i < process.argv.length; ++i) {
+
+        var keys = Object.keys(options);
+        for(var i=0; i<keys.length; ++i) {
+
+            var opt = options[keys[i]];
+            var type = opt.type;
+
+            if(type && type == 'string') {
+
+
+                break;
+            }
+            
+            // default type
+            // if(type && type == 'bool')
+        } 
+
+    }
+}
+
+var options = {
+
+    title: {
+        type: 'string', dflt: 'Demos',
+        help: 'set the page title text to TITLE.'
+    },
+    heading: {
+        type: 'string', dflt: 'Demos',
+        help: 'set <h1> page heading text to HEADING.'
+    },
+    http_port: {
+        type: 'string', dflt: '8080',
+        help: 'set the server HTTP port to HTTP_PORT.'
+    },
+    https_port: {
+        type: 'string', dflt: '8383',
+        help: 'set the server HTTPS port to HTTPS_PORT.'
+    },
+    exit_on_last: {
+        type: 'bool', dflt: false,
+        help: 'have server exit after last connection closes.'
+    },
+    on_exit: {
+        type: 'string',
+        help: 'run PROGRAM just before the server exits.',
+        argument: 'PROGRAM' // as in --on_exit=PROGRAM
+    },
+    kill_children: {
+        type: 'bool', dflt: false,
+        help: 'kill all launched children on exiting the server.'
+    },
+    passcode: {
+        type: 'string',
+        help: 'set client passcode to PASSCODE, if set the initial URL' +
+            ' for the service should be appended with something like:' +
+            "\n\n" +
+            '     https://example.com/?passcode=PASSCODE' +
+            "\n\n" +
+            'after which additional client requests will be secured with' +
+            ' cookies.'
+    },
+    signal: {
+        type: 'string',
+        eat: 2, // consumes 2 arguments making 2 strings
+        argument: 'SIG PID',
+        help: 'signal the process with PID with signal SIG just after the' +
+            'listening sockets are open.  Example: --signal SIGUSR1 2354.'
+    },
+    // User configuration/setting dir
+    config_dir: {
+        type: 'string', dflt: path.join(process.env.HOME, '.' + program_name),
+        help: 'set the server configuration and settings directory. ' +
+            'The default value or CONFIG_DIR is ${HOME}' +
+            path.sep + '.' + program_name + '.'
+    },
+    head: {
+        type: 'string', dflt: 'head.htm',
+        help: '(ADVANCED) set the launch pages prefix HTML text that' +
+            ' is at the top of every launcher page. ' +
+            'If the full path is not given the search path will start' +
+            ' at the installation prefix in the etc sub-directory.'
+    },
+    foot: {
+        type: 'string', dflt: 'foot.htm',
+        help: '(ADVANCED) set the launch pages suffix HTML text that' +
+            ' is at the bottom of every launcher page. ' +
+            'If the full path is not given the search path will start' +
+            ' at the installation prefix in the etc sub-directory.'
+    },
+    root_dir: {
+        type: 'string',
+        help: 'set the servers root document directory.  The default ' +
+            'ROOT_DIR is the current working directory this program ran from.'
+    },
+    //////////////////////////////////////////////////////////////////////
+    //            file types
+    //  kind-of like MIME type for webLauncher
+    //  The user can configure them though this options interface.
+    //  We define them by javaScript regular expression match.
+    //////////////////////////////////////////////////////////////////////
+    run_script_name: {
+        type: 'string', dflt: '/run/',
+        help: 'match this to find the files to be launched.'
+    },
+    run_txt: {
+        type: 'string', dflt: '/description\\.txt/',
+        help: 'match this to find launch descriptions in simple text.'
+    },
+    run_icon: {
+        type: 'string', dflt: '/^run_icon.*\\.(png|jpg|JPG)/',
+        help: 'match this to find launch image icons.'
+    },
+    main_menu: {
+        type: 'string', dflt: '/main_menu/',
+        help: 'set the name of the main menu directory.'
+    },
+    dir_txt: {
+        type: 'string', dflt: '/dir_description\\.txt/',
+        help: 'match this to find directory descriptions in simple text'
+    },
+    dir_icon: {
+        type: 'string', dflt: '/^dir_icon.*\\.(png|jpg|JPG)/',
+        help: 'match this to find directory icon images.'
+    }
+};
+
+
+// Old options TODO: to be removed and replaced by
+// options above.
 var 
 
     defaultTitle = 'Demos',
@@ -56,7 +234,6 @@ var
     child_process = require('child_process'),
     dns = require('dns'),
     url = require('url'),
-    path = require('path'),
     fs = require('fs'),
     util = require('util'),
     ws = require('ws').Server,
@@ -157,44 +334,6 @@ function ASSERT(x, msg) {
 
     throw('error'); // print stack trace??
     exit(1);
-}
-
-function usage() {
-    var prog = path.basename(__filename);
-
-    // Heredoc should be part of javascript!
-
-    console.log(
-"   Usage: " + prog + " [DOC_ROOT] [--exit-on-last] [--heading HEADING] [--kill-children]\\\n" +
-"        [--on-exit PROGRAM] [--passcode PASSCODE] [--signal SIG PID] [--title TITLE]\n" +
-"\n" +
-"  Run a " + prog + " HTTP/webSocket server.  \n" +
-"\n" +
-"  " + prog + " is a nodejs web server that provides a program launcher service using\n" +
-"  HTTP, HTTPS, Web Sockets and Web Sockets over TLS.\n" +
-"\n" +
-"  The default DOC_ROOT is the current working directory.\n" +
-"\n" +
-"\n" +
-"                    OPTIONS\n" +
-"\n" +
-"     --exit-on-last       have server exit after last connection closes\n" +
-"     --heading HEADING    set <h1> page heading text to HEADING\n" +
-"                          the default HEADING is \"" + defaultHeading + "\n" +
-"     --kill-children      kill all launched children on exiting the server\n" +
-"     --on-exit PROGRAM    run PROGRAM just before the server exits\n" +
-"     --passcode PASSCODE  set client passcode to PASSCODE, if set the initial URL for\n" +
-"                          the service will appended with something like:\n" +
-"\n" +
-"                                 https://host.com/?passcode=PASSCODE\n" +
-"\n" +
-"     --signal SIG PID     signal the process with PID with signal SIG just after the\n" +
-"                          listening sockets are open.  Example: --signal SIGUSR1 2354\n" +
-"     --title TITLE        set the page title text to TITLE\n" +
-"                          the default title is \"" + defaultTitle + "\n" +
-"\n"
-    );
-    process.exit(1);
 }
 
 function printLauncherObj(pre, json) {
@@ -1229,10 +1368,10 @@ function ws_OnConnection(socket) {
 // TODO: Hostname happens to be a value domain name, but this is not
 // good for the general server URL.
 if(passcode.length < 1)
-    console.log("webLauncher service at  => https://" +
+    console.log(program_name + " service at  => https://" +
             require('os').hostname() + ":" + httpsPort);
 else
-    console.log("webLauncher service at  => https://" +
+    console.log(program_name + " service at  => https://" +
             require('os').hostname() + ":" + httpsPort +
             '/?passcode=' + passcode);
 
