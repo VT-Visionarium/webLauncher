@@ -52,25 +52,37 @@ function usage() {
 
 function parseOptions() {
 
+    var keys;
+
     for(var i=2; i < process.argv.length; ++i) {
 
-        var keys = Object.keys(options);
-        for(var i=0; i<keys.length; ++i) {
+        keys = Object.keys(options);
+        for(var j=0; j<keys.length; ++j) {
 
-            var opt = options[keys[i]];
+            var opt = options[keys[j]];
             var type = opt.type;
-
             if(type && type == 'string') {
 
-
+                
                 break;
             }
             
             // default type
             // if(type && type == 'bool')
-        } 
-
+        }
     }
+
+    // Test that it worked by printing options
+    keys = Object.keys(options);
+    
+    for(var j=0; j<keys.length; ++j) {
+
+        var opt = options[keys[j]];
+
+       console.log(keys[j] + '  ' + opt.value + "\n\n");
+    }
+
+   process.exit(1); 
 }
 
 var options = {
@@ -178,6 +190,8 @@ var options = {
         help: 'match this to find directory icon images.'
     }
 };
+
+parseOptions();
 
 
 // Old options TODO: to be removed and replaced by
