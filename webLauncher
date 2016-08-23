@@ -52,37 +52,103 @@ function usage() {
 
 function parseOptions() {
 
-    var keys;
+    options.help = {};
+    options.help.type = 'bool';
+    options.help.help = 'print this help.';
 
-    for(var i=2; i < process.argv.length; ++i) {
+    var error = '';
+    var keys = Object.keys(options);
+    var alen = process.argv.length;
 
-        keys = Object.keys(options);
-        for(var j=0; j<keys.length; ++j) {
-
-            var opt = options[keys[j]];
-            var type = opt.type;
-            if(type && type == 'string') {
-
-                
-                break;
-            }
-            
-            // default type
-            // if(type && type == 'bool')
+    // initialize all the bool type options to false
+    for(var j=0; j<keys.length; ++j) {
+        var name = keys[j];
+        var opt = options[name];
+        var type = opt.type;
+        if(type === 'bool') {
+            opt.value = false;
         }
     }
 
-    // Test that it worked by printing options
-    keys = Object.keys(options);
-    
-    for(var j=0; j<keys.length; ++j) {
-
-        var opt = options[keys[j]];
-
-       console.log(keys[j] + '  ' + opt.value + "\n\n");
+    for(var i=2; i < alen; ++i) {
+        var arg = process.argv[i];
+        for(var k=0; k<keys.length; ++k) {
+            var name = keys[k];
+            var opt = options[name];
+            var type = opt.type;
+            console.log(name);
+            if(type && type == 'string') {
+                if(('--'+name === arg || '-'+name === arg) && alen > i+1) {
+                    // --option val   -option val
+                    var l = (opt.eat && typeof(opt.eat) === 'number')?opt.eat:1;
+                    if(l === 1)
+                        opt.value = process.argv[++i];
+                    else if(alen > i + l) {
+                        opt.value = [];
+                        while(l--)
+                            opt.push(process.argv[++i])
+                    }
+                    break;
+                }
+                var optlen = arg.indexOf('=') + 1;
+                if(optlen > 0 && ('--'+name+'=' === arg.substr(0,optlen) ||
+                            '-'+name+'=' === arg.substr(0, optlen)) &&
+                            arg.length > optlen) {
+                    // --option=val   -option=val
+                    var l = (opt.eat && typeof(opt.eat) === 'number')?opt.eat:1;
+                    if(l === 1) {
+                         opt.value = arg.substr(optlen);
+                    } else if(alen > i + l-1) {
+                        // like  % program --option=val0 val2
+                        // which is kind of strange
+                        opt.value = [];
+                        opt.push(arg.substr(optlen));
+                        l--;
+                        while(l--)
+                            opt.push(process.argv[++i]);
+                    }
+                    break;
+                }
+                // TODO: add short options like the list command 'ls -al'
+            }
+            if(type && type == 'bool') {
+                if('--'+name === arg || '-'+name === arg) {
+                    // --option  -option
+                    opt.value = true;
+                    break;
+                }
+            }
+        }
+        if(k === keys.length) {
+            if(error.length > 0)
+                error += ' ' + arg;
+            else
+                error = 'unknown option(s): ' + arg;
+        }
     }
 
-   process.exit(1); 
+
+    console.log("program options:\n------------------------");
+    // Test that it worked by printing options
+    for(var j=0; j<keys.length; ++j) {
+        var opt = options[keys[j]];
+        if(!opt.value) {
+            if(opt.dflt)
+                opt.value = opt.dflt;
+        }
+
+        console.log(keys[j] + '=' + opt.value);
+    }
+    console.log("---------------------------\n");
+
+    if(error.length > 0) {
+        console.log(error + "\n\n");
+        usage();
+    }
+
+
+    if(options.help.value)
+        usage();
 }
 
 var options = {
