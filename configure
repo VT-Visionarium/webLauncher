@@ -32,6 +32,8 @@ scriptdir="$(dirname $0)" || exit $?
 cd "$scriptdir" || exit $?
 scriptdir="$PWD"
 
+default_shabang='#!/usr/bin/env node'
+shabang="$default_shabang"
 
 function usage()
 {
@@ -39,7 +41,7 @@ function usage()
 
     cat << EOF
 
-  Usage: $prog [--prefix PREFIX] [--no-compress]
+  Usage: $prog [--prefix PREFIX] [--no-compress] [--node NPATH]
 
   Configure the webLauncher package installation.
   
@@ -48,6 +50,11 @@ function usage()
                        javascript and CSS files.  The default is compress
                        if yui-compressor is found when this script runs,
                        otherwise not
+
+  --node NPATH         set the full file path to the node (js) executable.
+                       By default it $prog will set the node server script
+                       to run with $default_shabang , when NPATH is set it
+                       will be #!NPATH
 
   --prefix PREFIX      set the installation directory prefix
                        the default PREFIX is $default_prefix
@@ -85,6 +92,13 @@ while [ -n "$1" ] ; do
         -*prefix=*)
             prefix="${1#*-prefix=}"
             ;;
+        -*node)
+            shift 1
+            shabang="#!${1}"
+            ;;
+        -*node=*)
+            shabang="#!${1#*-node=}"
+            ;;
         -*no-compress)
             jscompress="cat"
             csscompress="cat"
@@ -106,6 +120,7 @@ PREFIX = $prefix
 
 jscompress = $jscompress
 csscompress = $csscompress
+shabang = \\$shabang
 
 EOF
 

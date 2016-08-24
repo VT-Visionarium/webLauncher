@@ -11,6 +11,7 @@ hostname = $(shell hostname)
 PREFIX ?= /usr/local/encap/webLauncher
 jscompress ?= cat
 csscompress ?= cat
+shabang ?= \#!/usr/bin/env node
 ####################################################
 
 
@@ -18,13 +19,17 @@ WS = ws@1.1.1 # This version of the nodejs package ws works
 
 built_js_files = $(patsubst %.jsp,%.js,$(wildcard etc/*.jsp))
 built_css_files = $(patsubst %.cs,%.css,$(wildcard etc/*.cs))
+webLauncher_sources = $(sort $(wildcard *_wl.js))
 
 keys = etc/key.pem etc/cert.pem
 
 built_files = $(sort\
  $(built_js_files)\
  $(built_css_files)\
- $(keys) node_modules)
+ $(keys) node_modules)\
+ webLauncher
+
+sep = ////////////////////////////////////////////\n
 
 js_files = $(sort $(wildcard etc/*.js) $(built_js_files))
 css_files = $(sort $(wildcard etc/*.css) $(built_css_files))
@@ -41,8 +46,15 @@ ETC = $(PREFIX)/etc
 
 build: $(built_files)
 
+# everyone's favorite build tool is cat
+webLauncher: $(webLauncher_sources)
+	echo "$(shabang)" > $@
+	echo "// This is a generated file" >> $@
+	for i in $^ ; do echo "$(sep)// START $$i" >> $@; cat $$i >> $@; done
+	chmod 755 $@
+
 # We npm install a copy of ws
-node_modules: GNUmakefile
+node_modules:
 	npm install $(WS)
 
 # ref: http://superuser.com/questions/226192/openssl-without-prompt
@@ -73,4 +85,7 @@ install: mkdirs build
 
 clean:
 	rm -rf node_modules config.make $(built_files)
+
+distclean: clean
+	rm -f config.make
 
