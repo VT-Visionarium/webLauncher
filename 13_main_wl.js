@@ -1,52 +1,7 @@
-
-// Old options TODO: to be removed and replaced by
-// options above.
-var 
-
-    defaultTitle = 'Demos',
-
-    defaultHeading = 'Demos',
-
-    httpPort = 8080,
-    httpsPort = 8383,
-    exitOnLast = false,
-    killChildren = false,
-    rootDir = '',
-    passcode = '',
-    onExit = '',
-
-    // Filename of Launcher Scripts to link.
-    runnerScriptFilenames = [
-        'run'
-    ],
-
-    // Filename of Program Description Files
-    ///////////////////////////////////////
-
-    // For HTML fragment.  If found will not use
-    // txtDescFilename
-    htmDescFilename = 'description.htm',
-
-    // For simple text
-    txtDescFilename = 'description.txt',
-
-    // For small images we match this regrex
-    imgIconFilename = /^demoIcon.*\.(png|jpg|JPG)/,
-
-    // For large (Preview) images we match this regrex
-    imgPreviewFilename = /^demoPreview.*\.(png|jpg|JPG)$/,
-
-    // Directory name in rootDir with main menu level programs
-    headerDir = 'main_menu', // that are included in every page.
-
-
-//////////////////////////////////////////////////////////////////////
+var
 
     // We use a separate port for the web sockets
     // so that the code has less chance of braking.
-    heading = '',
-    title = '',
-    signal = [],
     https = require('https'),
     http = require('http'),
     querystring = require('querystring'),
@@ -62,20 +17,21 @@ var
     // clone the actual env vars to avoid overrides
     env = Object.create(process.env),
 
+    // Given the "run rule" that no more than one program of a given
+    // executable file name may run at the same time.  Launching a program
+    // of the same name stops the current running program of that name
+    // before launching the new one.  running_programs maps program base
+    // filename to server relative path to run because we must wait for
+    // the programs to next before running the next one.
+    running_programs = { }, // objects = { program_filename: relPath }
+
 
 //////////////////////////////////////////////////////////////////////
 //         Supporting Files
 //////////////////////////////////////////////////////////////////////
 
-    // User configuration/setting dir
-    userDir = process.env.HOME + '/.webLauncher',
-
     // Files in etc/ used to compose pages served
-    serverFiles = {
-        'head.htm': '', // Top of the page.
-        'foot.htm': ''  // Bottom of the page.
-    },
-
+    serverFiles = { },
 
 
 //////////////////////////////////////////////////////////////////////
@@ -86,56 +42,43 @@ var
 
 //////////////////////////////////////////////////////////////////////
 
+// initialize
+serverFiles[opt.head] = '';
+serverFiles[opt.foot] = '';
+
+
 
 function exit(stat) {
     var ret = 0;
     if(arguments.length > 0)
         ret = stat;
 
-    if(killChildren)
+    if(opt.kill_children)
         for(var key in launcher) {
             var child = launcher[key].child;
             if(child) {
-                child.kill('SIGINT');
-                child.kill('SIGTERM');
+                try {
+                    child.kill('SIGINT');
+                    child.kill('SIGTERM');
+                } catch(e) { }
             }
         }
 
-    if(onExit.length > 0) {
+    if(opt.on_exit.length > 0) {
 
-        var _onExit = onExit; // Save a copy of onExit
-
-        console.log("Running pre-exit program: " + onExit);
+        console.log("Running pre-exit program: " + opt.on_exit);
 
         try {
-            //////////// async version //////////
-            var child = child_process.spawn(onExit, 
-                {
+            child_process.execSync(opt.on_exit, {
                     cwd: cwdOrg,
-                    detached: false,
                     stdio: [0,1,2],
                     env: env
-                }
-            );
+            });
         } catch(err) {
-            console.log('Failed to start ' + onExit + ': ' + err);
+            console.log('Failed to run ' + opt.on_exit + ': ' + err);
             process.exit(34); // return error status
         }
-
-        console.log('running ' + onExit + " child.pid=", child.pid);
-
-        child.on('close', (code) => {
-            console.log(_onExit + ' pid=' +
-                child.pid + ' exited with status code=' + code);
-            console.log("Server Exiting")
-            process.exit(code);
-        });
-
-        onExit = ''; // stop it from being run again.
-        return; // We can't exit until the child finishes.
     }
-
-
 
     console.log("Server Exiting")
     process.exit(ret);
@@ -166,7 +109,7 @@ function printLauncherObj(pre, json) {
 // (browser) page reload can get current run states.
 function getLauncher(relPath, child_in) {
 
-    // Since URIs can had a leading '/' or not and still refer
+    // Since URIs can have a leading '/' or not and still refer
     // to the same resource, we add the leading '/' if it's not
     // there already, so the lookup for foo is the same as for /foo
     relPath = path.join('/', relPath);
@@ -225,108 +168,98 @@ function fileExists(f) {
 }
 
 
-
 function addLaunchersToPage(dir, relDir) {
  
     var launcherFooter =
         "    </div>\n" +
         "  </div>\n" +
         "</div>\n\n";
-
     var page = '';
 
-    for(var i=0; i<runnerScriptFilenames.length; ++i)
-    {
-        var scriptPath = path.join(dir, runnerScriptFilenames[i]);
-        var scriptURI = path.join(relDir, runnerScriptFilenames[i]);
-        if(!fileExists(scriptPath)) continue;
+    try {
+        var f = fs.readdirSync(dir);
+    } catch(e) {
+        return page;
+    }
 
-        console.log('found launcher script path=' + scriptPath);
+    for(var i=0; i<f.length; ++i) {
+        if(opt.run_script.test(f[i]))
+            break;
+    }
+    if(i === f.length) return page; // failed to find a script
+
+    var scriptPath = path.join(dir, f[i]);
+    var scriptURI = path.join(relDir, f[i]);
 
 
-        // We have script.  For each script we get a child/state
-        // launcher object.
-        var json = getLauncher(scriptURI).json;
-        var onclick = "\"launch(this)\"";
-        if(json.state == 'running')
-            onclick = "\"kill(this)\""
+    console.log('found launcher script path=' + scriptPath);
 
-        page = "<div class=box>\n" +
+    // We have a script.  For each script we get a child/state
+    // launcher object.
+    var json = getLauncher(scriptURI).json;
+    var onclick = "\"launch(this)\"";
+    if(json.state == 'running')
+        onclick = "\"kill(this)\""
+
+    page = "<div class=box>\n" +
 "  <span class=state>" + json.stateText + "</span>\n" +
 "  <div class=head>\n" +
 "    <div onclick=" + onclick + " id='" + scriptURI +
 "' class='" + json.className + "' title='run: " +
     scriptURI + "'>\n";
 
-        var f = path.join(dir, htmDescFilename);
-        var text;
-        try {
-            // TODO: fix relative URLs in this test
-            text = fs.readFileSync(f).toString();
-            page += text + launcherFooter;
-            // We have enough HTML for the launcher
-            break;
-        }
-        catch (e) {
-            text = false;
-        }
-
-        var images = [];
+    var text = false;
+    var images = [];
     
-        try {
-            // Find any images and add <img> tags to launcher <div>
-            var filenames = fs.readdirSync(dir);
-        }
-        catch(err) {
-            console.log('fs.readdirSync("' + dir + '") failed: ' + err);
-            process.exit(1);
-        }
-        for(var i=0; i<filenames.length; ++i) {
-            //console.log('checking img filename=' + filenames[i]);
-            if(imgIconFilename.test(filenames[i])) {
-                console.log('found img filename=' + filenames[i]);
-                images.push(path.join(relDir, filenames[i]));
-            }
-        }
-
-        f = path.join(dir, txtDescFilename);
-        try {
-            text = '';
-            // Put images at the top with given text
-            for(var i=0; i<images.length; ++i)
-                text += "      <img class=icon src='" + images + "'>\n";
-            text +=
-                "      <p>\n" +
-                fs.readFileSync(f).toString().replace(/\n\n/g,
-                "\n" +
-                "      </p>\n" +
-                "      <p>\n") +
-                "      </p>\n";
-        }
-        catch (e) {
-            text = false;
-        }
-
-        if(!text) {
-            text = '';
-            // Put images at the top but with generic text
-            for(var i=0; i<images.length; ++i)
-                text += "      <img class=icon src='" + images[i] + "'>\n";
-            text +=
-                "      <p class=genericprog>Run " +
-                path.basename(path.dirname(scriptURI)) +
-                "      <\p>\n" +
-                "      <p class=genericdesc>You can add a description to this " +
-                "program by creating the\n" +
-                "      plain text file " +  path.join(dir, txtDescFilename) + "\n" +
-                "      or the HTML fragment file " + path.join(dir, htmDescFilename) +
-                "\n    </p>\n";
-        }
-
-        page += text + launcherFooter;
-        // We how have a script to launch for this directory
-        break;
+    try {
+        // Find any images and add <img> tags to launcher <div>
+        var filenames = fs.readdirSync(dir);
+    } catch(err) {
+        console.log('fs.readdirSync("' + dir + '") failed: ' + err);
+        process.exit(1);
     }
+    for(var i=0; i<filenames.length; ++i) {
+        //console.log('checking img filename=' + filenames[i]);
+        if(opt.run_icon.test(filenames[i])) {
+            console.log('found img filename=' + filenames[i]);
+            images.push(path.join(relDir, filenames[i]));
+        }
+    }
+
+    f = path.join(dir, opt.run_txt);
+    try {
+        text = '';
+        // Put images at the top with given text
+        for(var i=0; i<images.length; ++i)
+            text += "      <img class=icon src='" + images + "'>\n";
+        text +=
+            "      <p>\n" +
+            fs.readFileSync(f).toString().replace(/\n\n/g,
+            "\n" +
+            "      </p>\n" +
+            "      <p>\n") +
+            "      </p>\n";
+    } catch(e) {
+        text = false;
+    }
+
+    if(!text) {
+        text = '';
+        // Put images at the top but with generic text
+        for(var i=0; i<images.length; ++i)
+            text += "      <img class=icon src='" + images[i] + "'>\n";
+        text +=
+            "      <p class=genericprog>Run " +
+            path.basename(path.dirname(scriptURI)) +
+            "      <\p>\n" +
+            "      <p class=genericdesc>You can add a description to this " +
+            "program by creating the\n" +
+            "      plain text file " +
+            path.join(dir, opt.run_txt) + ".\n      </p>\n";
+    }
+
+    page += text + launcherFooter;
+    // We how have a script to launch for this directory
     return page;
 }
 
@@ -346,8 +279,7 @@ function addDirsToPage(dir, relDir) {
     // Now find directories in this directory
     try {
         var dirs = fs.readdirSync(dir);
-    }
-    catch(e) {
+    } catch(e) {
         // not able to open as a directory
         dirs = [];
     }
@@ -367,18 +299,18 @@ function addDirsToPage(dir, relDir) {
     return page;
 }
 
-// Returns true if dir has a directory in it and another directory in that
-// (3 levels of directories), or a run script a sub-directory
-// (dir/dir2/script) of dir.
+// Returns true if dir0 has a directory in it and another directory in
+// that (3 levels of directories dir0/dir1/dir2), or a run script in a
+// sub-directory (dir0/dir1/script) of dir0.
 //
-// Note: There is no point in indexing a directory unless there a script
-// in a sub-directory of that directory, or there is a in a sub-directory
-// of that directory (where there may be a script).  How deep does the
-// rabbit hole go?
-function checkForDirectories(dir)
+// Note: There is no point in HTML indexing a directory unless there a
+// script in a sub-directory of that directory, or there is a in a
+// sub-directory of that directory (where there may be a script).  How
+// deep does the rabbit hole go?
+function checkForDirectories(dir0)
 {
     try {
-        var ch = fs.lstatSync(dir).isDirectory();
+        var ch = fs.lstatSync(dir0).isDirectory();
     } catch(e) {
         return false;
     }
@@ -387,32 +319,27 @@ function checkForDirectories(dir)
 
     // Now find directories in this directory
     try {
-        var dirs = fs.readdirSync(dir);
-    }
-    catch(e) {
+        var f0 = fs.readdirSync(dir0);
+    } catch(e) {
         // not able to open as a directory
         return false;
     }
 
     try {
-        for(var i=0; i<dirs.length;++i) {
-            var d = path.join(dir,dirs[i]);
-            for(var j=0; j<runnerScriptFilenames.length; ++j)
-                if(fileExists(path.join(d, runnerScriptFilenames[j])))
-                    // We have a run script in a directory (d) in dir
-                    return true;
-            if(fs.lstatSync(d).isDirectory()) {
-                try {
-                    var ds = fs.readdirSync(d);
+        for(var i=0; i<f0.length;++i) {
+            var dir1 = path.join(dir0,f0[i]);
 
-                    for(var k=0; k<ds.length;++k) {
-                        if(fs.lstatSync(path.join(d,ds[i])).isDirectory())
-                            // We have a directory in a directory in dir.
-                            return true;
-                    }
-                } catch(e) {
-                    continue;
-                }
+            if(fs.lstatSync(dir1).isDirectory()) {
+                var f1 = fs.readdirSync(dir1);
+
+                for(var j=0; j<f1.length; ++j)
+                    if(opt.run_script.test(f1[j]))
+                        // We found a run script in dir1
+                        return true;
+
+                if(fs.lstatSync(path.join(dir1,f1[i])).isDirectory())
+                    // We have a directory in a directory in dir0.
+                    return true;
             }
         }
     } catch(e) {
@@ -428,10 +355,10 @@ function getPage(dir, relDir) {
 
     // TODO: This could read head.htm (and foot.htm) each time so
     // that changes go into effect immediately.
-    var page = serverFiles['head.htm'].toString().
+    var page = serverFiles[opt.head].toString().
         replace('@TITLE@', opt.title) + "\n" +
-        '<div id=heading>' + heading + "</div>\n" + 
-        "\n<!-- This was a generated file.\n  END head.htm -->\n\n";
+        '<div id=heading>' + opt.heading + "</div>\n" + 
+        "\n<!-- This was a generated file.\n  END " + opt.head + " -->\n\n";
 
 
     /////////////////////////////////////////////
@@ -447,7 +374,7 @@ function getPage(dir, relDir) {
 
     try {
         // Add simple description text
-        var f = path.join(rootDir, txtDescFilename);
+        var f = path.join(opt.root_dir, opt.run_txt);
         s +=
                 "      <p>\n" +
                 fs.readFileSync(f).toString().replace(/\n\n/g,
@@ -467,33 +394,34 @@ function getPage(dir, relDir) {
     //////////////////////////////////////////////////
 
    page += 
-        "<hr><h2>Main Menu: " + rootDir + "</h2>\n";
+        "<hr><h2>Main Menu: " + opt.root_dir + "</h2>\n";
 
     // Top Top launcher
     // TODO: port '/' to Windoz.
-    page +=  addLaunchersToPage(rootDir,'/');
+    page +=  addLaunchersToPage(opt.root_dir,'/');
 
-    var headerDirFull = path.join(rootDir, headerDir);
+    var headerDirFull = path.join(opt.root_dir, opt.main_menu);
 
     try {
 
         if(fs.lstatSync(headerDirFull).isDirectory())
-            s += addLaunchersToPage(headerDirFull, '/' + headerDir);
+            s += addLaunchersToPage(headerDirFull, '/' + opt.main_menu);
 
         if(checkForDirectories(headerDirFull)) {
 
-            // Now look for scripts in sub-directories of headerDir
+            // Now look for scripts in sub-directories of main menu
             var dirs = fs.readdirSync(headerDirFull);
 
             for(var i=0; i<dirs.length;++i) {
                 var d = path.join(headerDirFull,dirs[i]);
                 if(fs.lstatSync(d).isDirectory()) {
-                    s += addLaunchersToPage(d, path.join('/' + headerDir, dirs[i]));
+                    s += addLaunchersToPage(d, path.join('/' +
+                                opt.main_menu, dirs[i]));
                 }
             }
         }
     } catch(e) {
-        // The directory headerDir was not readable which is fine.
+        // The directory main_menu was not readable which is fine.
         s = '';
         console.log('No header scripts found');
     }
@@ -564,7 +492,7 @@ function getPage(dir, relDir) {
         "<h2>Directory " + dir + "</h2>\n";
 
     for(var i=0; i<dirs.length;++i)
-        if(dir != headerDir &&
+        if(dir != opt.main_menu &&
                 fs.lstatSync(path.join(dir,dirs[i])).isDirectory() ) {
             page += addLaunchersToPage(
                 path.join(dir, dirs[i]),
@@ -573,124 +501,30 @@ function getPage(dir, relDir) {
 
     // TODO: This could read foot.htm (and head.htm) each time
     // so that changes go into effect immediately.
-    return page + "\n<!-- BEGIN foot.htm -->\n" +
-        serverFiles['foot.htm'];
+    return page + "\n<!-- BEGIN " + opt.foot + " -->\n" +
+        serverFiles[opt.foot];
 }
 
 function checkHeading() {
 
-    if(heading.length < 1) {
-        if(title.length >= 1)
-            heading = '<h1>' + title + '</h1>';
-        else
-            heading = defaultHeading;
-    }
-    if(!heading.match(/</)) {
-        heading = escapeHTML(heading);
-        heading = '<h1>' + heading + '</h1>';
+    if(!opt.heading.match(/</)) {
+        opt.heading = escapeHTML(opt.heading);
+        opt.heading = '<h1>' + opt.heading + '</h1>';
     }
 }
 
 function config() {
 
-    for(var i=2; i < process.argv.length; ++i) {
-        var str = process.argv[i];
-        // TODO: rewrite this switch mess!!!!
-        // This is still much less code than a generic option parser.
-        switch(str) {
-            case '-h':
-            case '--h':
-            case '-help':
-            case '--help':
-                usage();
-                break;
-            case '-heading':
-            case '--heading':
-                if(++i < process.argv.length)
-                    heading = process.argv[i];
-                else
-                    usage();
-                break;
-            case '-passcode':
-            case '--passcode':
-                if(++i < process.argv.length)
-                    passcode = process.argv[i];
-                else
-                    usage();
-                break;
-            case '-signal':
-            case '--signal':
-                if(++i < process.argv.length)
-                    signal[0] = process.argv[i];
-                else
-                    usage();
-                if(++i < process.argv.length)
-                    signal[1] = process.argv[i];
-                else
-                    usage();
-                break;
-            case '-title':
-            case '--title':
-                if(++i < process.argv.length)
-                    title = process.argv[i];
-                else
-                    usage();
-                break;
-            case '-on-exit':
-            case '--on-exit':
-                if(++i < process.argv.length)
-                    onExit = process.argv[i];
-                else
-                    usage();
-                break;
-            case '--exit-on-last':
-            case '-exit-on-last':
-                exitOnLast = true;
-                break;
-            case '--kill-children':
-            case '-kill-children':
-                killChildren = true;
-                break;
-            default:
-                if(/^-(-|)heading=/.test( process.argv[i])) {
-                    heading = process.argv[i].replace(/^-(-|)heading=/,'');
-                    break;
-                }
-                if(/^-(-|)passcode=/.test( process.argv[i])) {
-                    passcode = process.argv[i].replace(/^-(-|)passcode=/,'');
-                    break;
-                }
-                if(/^-(-|)on-exit=/.test( process.argv[i])) {
-                    onExit = process.argv[i].replace(/^-(-|)on-exit=/,'');
-                    break;
-                }
-                if(/^-(-|)title=/.test( process.argv[i])) {
-                    title = process.argv[i].replace(/^-(-|)title=/,'');
-                    break;
-                }
-                if(str.match(/^-/))
-                    usage();
-                try {
-                    // The default argument is the root document directory.
-                    // What better way to test that we can use it than cd to it.
-                    process.chdir(str);
-                }
-                catch(err) {
-                    console.log('Cannot cd to ' + str + "\n\n");
-                    usage();
-                }
-                break;
-        }
-    };
-
-    if(title.length < 1) {
-        if(heading.length >= 1)
-            title =  heading;
-        else
-            title = defaultTitle;
+    try {
+        process.chdir(opt.root_dir);
+    } catch(e) {
+        console.log('changing to document root "' +
+                opt.root_dir + '" failed: ' + e);
     }
+    // Get the full path to the document root
+    opt.root_dir = process.cwd();
 
-    title = escapeHTML(title);
+    opt.title = escapeHTML(opt.title);
 
     checkHeading();
 
@@ -709,8 +543,7 @@ function config() {
         headFile = path.join(etcDir, serverFiles[filenames[i]]);
         try {
                 fs.accessSync(headFile, fs.R_OK)
-        }
-        catch(err) {
+        } catch(err) {
             etcDir = '';
         }
         if(etcDir != '') break;
@@ -719,7 +552,7 @@ function config() {
         console.log(
             'Cannot find supporting files in directories: ' +
             etcDirs + "\n\n");
-        usage();
+        process.exit(2);
     }
 
     for(var i=0; i < filenames.length; ++i)
@@ -727,38 +560,34 @@ function config() {
         try {
             serverFiles[filenames[i]] =
                 fs.readFileSync(path.join(etcDir, filenames[i]));
-        }
-        catch(err) {
+        } catch(err) {
             console.log("Error: " + err + "\n\n");
-            usage();
+            process.exit(2);
         }
     }
     var d = false;
     try {
-        d = fs.statSync(userDir);
+        d = fs.statSync(opt.config_dir);
     } catch(err) {
-            fs.mkdirSync(userDir, (err, userDir) => {
+            fs.mkdirSync(opt.config_dir, (err) => {
                 if(err)
                 {
                     console.log("Failed to make directory: " +
-                        userDir + "\n" + err + "\n\n");
-                    process.exit(1);   
+                        opt.config_dir + "\n" + err + "\n\n");
+                    process.exit(1);
                 }
         });
-        console.log("Made directory: " + userDir);
+        console.log("Made directory: " + opt.config_dir);
     } 
     if(d && !d.isDirectory()) {
-        console.log(userDir + " is not a directory.\n");
+        console.log(opt.config_dir + " is not a directory.\n");
         process.exit(1);
     }
 
-
-    rootDir =  process.cwd();
-
     // Report
-    console.log('Document root is ' + rootDir);
-    console.log('HTTPS server Port is ' + httpsPort);
-    console.log('localhost HTTP server Port is ' + httpPort);
+    console.log('Document root is ' + opt.root_dir);
+    console.log('HTTPS server Port is ' + opt.https_port);
+    console.log('localhost HTTP server Port is ' + opt.http_port);
 }
 
 
@@ -776,9 +605,82 @@ function spewObject(obj, pre) {
 //  The Protocol is:
 //     browser (client) sends http GET of /bla/bla?run
 //     server replies with JSON "State" object
-//     
 
 
+function run(relPath, response) {
+
+    var launch = getLauncher(relPath);
+    var fullPath = path.join(opt.root_dir, relPath);
+    
+    console.log('server running: ' + fullPath);
+
+    try {
+        //////////// async version //////////
+        var child = child_process.spawn(fullPath, 
+            {
+                cwd: path.dirname(fullPath),
+                detached: true,
+                stdio: [0,1,2],
+                env: env
+            }
+        );
+    } catch(err) {
+
+            console.log('Failed to start ' + fullPath + ': ' + err);
+            ++launch.json.runCount;
+            sendDeadToSockets(launch, 'Failed to run (' +
+                        launch.json.runCount + ').');
+
+            if(response) {
+                response.writeHead(200, {"Content-Type": "text/plain"});
+                response.write(JSON.stringify(launch.json));
+                response.end();
+            }
+            return;
+    }
+
+    var basename = path.basename(relPath);
+    running_programs[basename] = relPath;
+
+    console.log('ran ' + fullPath + " child.pid=", child.pid);
+
+    launch = getLauncher(relPath, child);
+    launch.json.className = 'running';
+    launch.json.state = 'running';
+    ++launch.json.runCount;
+    launch.json.stateText = 'Running (' + launch.json.runCount +
+            ') pid: ' + child.pid;
+    launch.child = child;
+    launch.json.pid = child.pid;
+
+    if(response) {
+        response.writeHead(200, {"Content-Type": "text/plain"});
+        // The program may of may not be running now.  If it's not
+        // running we'll find out in the child "close" event in due
+        // time; so for now, to keep things simple, we just say it's
+        // running, it gets updated later.
+        response.write(JSON.stringify(launch.json));
+        response.end();
+    }
+
+    socketsSend(JSON.stringify(launch.json));
+
+    child.on('close', (code) => {
+        console.log(launch.json.relPath + ' pid=' +
+            child.pid + ' exited with status code=' + code);
+        sendDeadToSockets(launch);
+        delete running_programs[path.basename(relPath)];
+
+        if(launch.runNext) {
+            var nextRelPath = launch.runNext;
+            delete launch.runNext;
+            launch = getLauncher(nextRelPath);
+            if(launch.runNext)
+                delete launch.runNext; 
+            run(nextRelPath);
+        }
+    });
+}
 
 
 function httpRequest(request, response) {
@@ -800,7 +702,8 @@ function httpRequest(request, response) {
         return "text/plain";
     }
 
-    console.log('accepted connection from address:  ' + request.connection.remoteAddress);
+    console.log('accepted connection from address: ' +
+            request.connection.remoteAddress);
 
     var parse =  url.parse(request.url);
 
@@ -808,7 +711,7 @@ function httpRequest(request, response) {
             " parse.query=" + parse.query +
             " parse.pathname=" + parse.pathname);
 
-    var fpath = path.join(rootDir, parse.pathname);
+    var fpath = path.join(opt.root_dir, parse.pathname);
 
     try {
         var stats = fs.lstatSync(fpath);
@@ -823,7 +726,9 @@ function httpRequest(request, response) {
         //////////// Run fpath //////////////
         /////////////////////////////////////
         
-        var launch = getLauncher(parse.pathname);
+        // Check for waiting jobs
+        var relPath = path.join('/',parse.pathname);
+        var launch = getLauncher(relPath);
 
         if(launch.child) {
             var sdata = JSON.stringify(launch.json);
@@ -841,57 +746,32 @@ function httpRequest(request, response) {
             return;
         }
 
-        //console.log('server running: ' + fpath);
+        if(launch.runNext)
+            delete launch.runNext;
 
-        try {
-            //////////// async version //////////
-            var child = child_process.spawn(fpath, 
-                {
-                    cwd: path.dirname(fpath),
-                    detached: false,
-                    stdio: [0,1,2],
-                    env: env
-                }
-            );
-        } catch(err) {
+        var basename = path.basename(relPath);
+        var relPathRunning = running_programs[basename];
+        if(relPathRunning) {
+            // This should not be the same, because we check
+            // for that case just above. if(launch.child) { ...
+            ASSERT(relPathRunning != relPath,
+                'Two programs with the same relative path "' +
+                relPath + '" are running at the same time');
+            var otherLaunch = getLauncher(relPathRunning);
+            ASSERT(otherLaunch, 'launcher for URI: ' +
+                    relPathRunning + ' was not found');
+            otherLaunch.runNext = relPath;
+            console.log('server queued to run: ' + fpath);
 
-            console.log('Failed to start ' + fpath + ': ' + err);
-            ++launch.json.runCount;
-            sendDeadToSockets(launch, 'Failed to run (' +
-                        launch.json.runCount + ').');
-
-            response.writeHead(200, {"Content-Type": "text/plain"});
-            response.write(JSON.stringify(launch.json));
-            response.end();
+            try {
+                console.log("killing " + relPathRunning);
+                otherLaunch.child.kill('SIGINT');
+                otherLaunch.child.kill('SIGTERM');
+            } catch(e) { }
             return;
         }
 
-        console.log('ran ' + fpath + " child.pid=", child.pid);
-
-        launch = getLauncher(parse.pathname, child);
-        launch.json.className = 'running';
-        launch.json.state = 'running';
-        ++launch.json.runCount;
-        launch.json.stateText = 'Running (' + launch.json.runCount +
-                ') pid: ' + child.pid;
-        launch.child = child;
-        launch.json.pid = child.pid;
-
-        response.writeHead(200, {"Content-Type": "text/plain"});
-        // The program may of may not be running now.  If it's not
-        // running we'll find out in the child "close" event in due
-        // time; so for now, to keep things simple, we just say it's
-        // running, it gets updated later.
-        response.write(JSON.stringify(launch.json));
-        response.end();
-
-        socketsSend(JSON.stringify(launch.json));
-
-        child.on('close', (code) => {
-            console.log(launch.json.relPath + ' pid=' +
-                child.pid + ' exited with status code=' + code);
-            sendDeadToSockets(launch);
-        });
+        run(relPath, response);
 
     } else if(parse.query == 'etc') {
         /////////////////////////////////////
@@ -948,10 +828,10 @@ function httpRequest(request, response) {
     console.log("GOT parse.query JSON=" + JSON.stringify(obj));
 
     if(obj.HEADING) {
-        heading = obj.HEADING;
+        opt.heading = obj.HEADING;
         checkHeading();
-        response.write(JSON.stringify({ type: 'HEADING', heading: heading }));
-        socketsSend(JSON.stringify({ type: 'HEADING', heading: heading }));
+        response.write(JSON.stringify({ type: 'HEADING', heading: opt.heading }));
+        socketsSend(JSON.stringify({ type: 'HEADING', heading: opt.heading }));
     }
 
     // add it to the spawn environment
@@ -988,7 +868,7 @@ function httpRequest(request, response) {
 }
 
 // The http server
-var server = http.createServer(httpRequest).listen(httpPort, 'localhost');
+var server = http.createServer(httpRequest).listen(opt.http_port, 'localhost');
 
 // Just adding one argument is the difference between http and https :)
 // For the https server
@@ -1008,7 +888,7 @@ var sserver = https.createServer({
 
         return list;
     }
-   if(passcode.length > 0) {
+   if(opt.passcode.length > 0) {
         ////////////////////////////////////////////////////////////////////
         // Restrict access to this server.
         // We do this by:
@@ -1023,11 +903,13 @@ var sserver = https.createServer({
 
         var obj = querystring.parse(url.parse(request.url).query);
         var cookie = parseCookies(request);
-        var need_pass_cookie = !cookie.passcode || cookie.passcode != passcode;
+        var need_pass_cookie = (!cookie.passcode ||
+                    cookie.passcode != opt.passcode);
 
         if(need_pass_cookie &&
 
-            (!obj.passcode || obj.passcode.length < 1 || obj.passcode != passcode)) {
+            (!obj.passcode || obj.passcode.length < 1 ||
+             obj.passcode != opt.passcode)) {
 
                 console.log('rejected connection from address:  ' +
                     request.connection.remoteAddress.replace(/^.*:/, '') +
@@ -1040,13 +922,13 @@ var sserver = https.createServer({
                 return;
             }
         else if(need_pass_cookie)
-            response.setHeader('Set-Cookie', 'passcode=' + passcode);
+            response.setHeader('Set-Cookie', 'passcode=' + opt.passcode);
     }
 
 
     httpRequest(request, response);
 
-}).listen(httpsPort);
+}).listen(opt.https_port);
 
 
 function socketsSend(text) {
@@ -1111,10 +993,9 @@ function handleMessageKill(json)
         // The child close event will change the launcher object
         child.kill('SIGINT');
         child.kill('SIGTERM');
-
-        //process.kill(child.pid, 'SIGINT');
     } catch(err) {
-        console.log('signaling child failed: ' + err);
+        // The second child.kill('SIGTERM') may or may not fail
+        //console.log('signaling child failed: ' + err);
     }
 }
 
@@ -1156,7 +1037,7 @@ function ws_OnConnection(socket) {
                 break;
             }
 
-        if(Object.keys(sockets).length == 0 && exitOnLast) {
+        if(Object.keys(sockets).length == 0 && opt.exit_on_last > -1) {
 
             setTimeout(function() {
                 // We exit if no connection came to be in the timeout.
@@ -1166,9 +1047,10 @@ function ws_OnConnection(socket) {
                     console.log('no more Web Socket connections: exiting');
                     exit();
                 }
-            }, 3000 /* milli-seconds */);
+            }, opt.exit_on_last /* milli-seconds */);
         }
-        console.log("There are now " + Object.keys(sockets).length + " Web Socket connection(s)");
+        console.log("There are now " + Object.keys(sockets).length +
+                " Web Socket connection(s)");
     });
 
     // Add this socket to our list of sockets.
@@ -1186,24 +1068,26 @@ function ws_OnConnection(socket) {
 
 // TODO: Hostname happens to be a value domain name, but this is not
 // good for the general server URL.
-if(passcode.length < 1)
-    console.log(program_name + " service at  => https://" +
-            require('os').hostname() + ":" + httpsPort);
+if(opt.passcode.length < 1)
+    console.log(opt.program_name + " service at  => https://" +
+            require('os').hostname() + ":" + opt.https_port);
 else
-    console.log(program_name + " service at  => https://" +
-            require('os').hostname() + ":" + httpsPort +
-            '/?passcode=' + passcode);
+    console.log(opt.program_name + " service at  => https://" +
+            require('os').hostname() + ":" + opt.https_port +
+            '/?passcode=' + opt.passcode);
 
-console.log("          and locally  => http://localhost:" + httpPort);
+console.log("          and locally  => http://localhost:" +
+        opt.http_port);
 
 
 
-if(signal.length >= 1)
+if(opt.signal.length >= 1)
 {
     try {
-    process.kill(signal[1], signal[0]);
+        process.kill(opt.signal[1], opt.signal[0]);
     } catch (err) {
-        console.log('signaling ' );
+        console.log('signaling ' + opt.signal[0] + ' to PID=' +
+                opt.signal[1] + ' failed');
     }
 }
 

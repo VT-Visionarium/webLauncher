@@ -1,47 +1,22 @@
 
-var path = require('path');
 
-var environment_prefix = 'WEB_LAUNCHER_';
-var program_name = 'webLauncher';
+function parseOptions(path) {
 
-var usage_text = 'Run a ' + program_name + ' HTTP/webSocket server. ' +
+    //////////////////////////////////////////////////////////////////////
+    //     BEGIN parseOptions() CONFIGURATION
+    //////////////////////////////////////////////////////////////////////
+
+    var default_seperator = ',';
+    var program_name = 'webLauncher';
+
+    var usage_text = 'Run a ' + program_name + ' HTTP/webSocket server. ' +
         program_name +
         ' is a nodejs web server that provides a program launcher' +
         ' service using HTTP, HTTPS, Web Sockets and Web Sockets' +
         ' over TLS.';
 
-
-var opt = {};
-
-
-// Convert string to regexp and vise-versa
-function convertStringRegex(x) {
-    if(typeof(x) === 'string')
-        // convert to regexp
-        return new RegExp(str);
-    // else convert to string
-    return x.toString();
-}
-
-function usage() {
-
-    console.log('Usage: ' + program_name + " [OPTIONS]\n\n" +
-            usage_text + " \n\n" +
-            "                   OPTIONS\n\n");
+    var environment_prefix = program_name.toUpperCase() + '_';
     
-    var keys = Object.keys(options);
-    for(var i=0; i<keys.length; ++i) {
-
-        var opt = options[keys[i]];
-
-       console.log(keys[i] + '  ' + opt.help + "\n\n");
-    }
-
-    process.exit(1);
-}
-
-function parseOptions() {
-
     // The options list is longer than the code that parses the options.
     var options = {
 
@@ -62,8 +37,12 @@ function parseOptions() {
         help: 'set the server HTTPS port to HTTPS_PORT.'
     },
     exit_on_last: {
-        type: 'bool', dflt: false,
-        help: 'have server exit after last connection closes.'
+        type: 'number', dflt: -1, // -1 is off
+        argument: 'MILLI_SECS',
+        help: 'have server exit after last connection closes.' +
+            ' MILLI_SECS is the time to wait after the last ' +
+            'connection is closed. MILLI_SECONDS is -1 for not ' +
+            'exiting on last connection close.'
     },
     on_exit: {
         type: 'string',
@@ -78,24 +57,29 @@ function parseOptions() {
         type: 'string',
         help: 'set client passcode to PASSCODE, if set the initial URL' +
             ' for the service should be appended with something like:' +
-            "\n\n" +
-            '     https://example.com/?passcode=PASSCODE' +
-            "\n\n" +
-            'after which additional client requests will be secured with' +
+            ' https://example.com/?passcode=PASSCODE' +
+            ' after which additional client requests will be secured with' +
             ' cookies.'
     },
     signal: {
-        type: 'string',
+        type: 'string', seperator: ',',
+        default_print: false, // Do no print "The default value is bla bla"
+        // in the help.
         eat: 2, // consumes 2 arguments making 2 strings
-        argument: 'SIG PID',
+        // example: "--signal=USR1 2314"
+        // separator: ' '  is the default.  It separates USR1 and 2314
+        argument: 'SIG,PID',
+        // sample args for help as in "--signal=USR1,PID"
+        // or -signal USR1 2314 or --signal USR1,2314
+        // or --signal=USR1,2314  all would work
         help: 'signal the process with PID with signal SIG just after the' +
-            'listening sockets are open.  Example: --signal SIGUSR1 2354.'
+            'listening sockets are open.  Example: --signal USR1,2354.'
     },
     // User configuration/setting dir
     config_dir: {
         type: 'string', dflt: path.join(process.env.HOME, '.' + program_name),
         help: 'set the server configuration and settings directory. ' +
-            'The default value or CONFIG_DIR is ${HOME}' +
+            'The default value of CONFIG_DIR is ${HOME}' +
             path.sep + '.' + program_name + '.'
     },
     head: {
@@ -113,7 +97,7 @@ function parseOptions() {
             ' at the installation prefix in the etc sub-directory.'
     },
     root_dir: {
-        type: 'string',
+        type: 'string', dflt: process.cwd(),
         help: 'set the servers root document directory.  The default ' +
             'ROOT_DIR is the current working directory this program ran from.'
     },
@@ -123,28 +107,28 @@ function parseOptions() {
     //  The user can configure them though this options interface.
     //  We define them by javaScript regular expression match.
     //////////////////////////////////////////////////////////////////////
-    run_script_name: {
-        type: 'string', dflt: '/(.*_|)run/',
+    run_script: {
+        type: 'regexp', dflt: '(.*_|)run',
         help: 'match this to find the files to be launched.'
     },
     run_txt: {
-        type: 'string', dflt: '/description\\.txt/',
+        type: 'string', dflt: 'description.txt',
         help: 'match this to find launch descriptions in simple text.'
     },
-    run_icon: {
-        type: 'string', dflt: '/^run_icon.*\\.(png|jpg|JPG)/',
+    run_icon: { // TODO: change this and tests and CAVE files
+        type: 'regexp', dflt: '^launcherIcon.*\\.(png|jpg|JPG)',
         help: 'match this to find launch image icons.'
     },
     main_menu: {
-        type: 'string', dflt: '/main_menu/',
+        type: 'string', dflt: 'main_menu',
         help: 'set the name of the main menu directory.'
     },
     dir_txt: {
-        type: 'string', dflt: '/dir_description\\.txt/',
+        type: 'regexp', dflt: 'dir_description\\.txt',
         help: 'match this to find directory descriptions in simple text'
     },
     dir_icon: {
-        type: 'string', dflt: '/^dir_icon.*\\.(png|jpg|JPG)/',
+        type: 'regexp', dflt: '^dir_icon.*\\.(png|jpg|JPG)',
         help: 'match this to find directory icon images.'
     },
     help: {
@@ -153,7 +137,112 @@ function parseOptions() {
     }
     };
 
+    //////////////////////////////////////////////////////////////////////
+    //       END parseOptions() CONFIGURATION
+    //////////////////////////////////////////////////////////////////////
+
     var error = '';
+
+    function addError(str) {
+        if(error.length > 0)
+            error += ' ' + str;
+        else
+            error = 'bad option(s): ' + str;
+    }
+ 
+    var spaces = '                                                  ' +
+        '                                                           ' +
+        '                           ',
+        right0 = 4,  // chars left margin
+        right1 = 31, // position to left side of help
+        min_width = 50, // minimum width
+        width = 78;  // width of text
+
+    function write(str) {
+        process.stdout.write(str);
+    }
+
+    function print(str, right, next_right) {
+
+        var i;
+        var out = '';
+
+        while(str.length > 0 && str.substr(0,1) == ' ') str = str.substr(1);
+        out = spaces.substr(0,right) + str;
+        if(arguments.length > 2)
+            right = next_right;
+
+        while(out.length > width) {
+            for(i=width; i>min_width && out.substr(i,1) != ' '; --i);
+            if(i == min_width)
+                // We failed to find a space so show it all.
+                i = width;
+
+            write(out.substr(0,i) + "\n");
+            out = out.substr(i);
+            while(out.length > 0 && out.substr(0,1) == ' ') out = out.substr(1);
+            if(out.length > 0)
+                out = spaces.substr(0,right) + out;
+        }
+        write(out + "\n");
+    }
+
+    function usage() {
+
+        write('  Usage: ' + program_name + " [OPTIONS]\n\n");
+        print(usage_text, 2);
+        write("\n");
+
+        print(
+            'The following options may be set using the command line ' +
+            'or via an environment variable with a with the name being ' +
+            'prefixed with ' + environment_prefix + ' and in all caps ' +
+            'like for example:', 2);
+
+        write("\n      " + environment_prefix + 'TITLE="Cool Examples" ' +
+                program_name + "\n\n");
+
+        print('will set the --title option to "Cool Examples"', 2);
+
+        write("\n\n                 --------- OPTIONS --------\n\n");
+
+        var keys = Object.keys(options);
+        for(var i=0; i<keys.length; ++i) {
+            var pre = '--' + keys[i];
+            var opt = options[keys[i]];
+            if(opt.type === 'string' ||
+                    opt.type === 'regexp' ||
+                    opt.type === 'number')
+                pre += ' ' + opt.argument;
+
+            if(pre.length < right1 - right0)
+                pre += spaces.substr(0, right1 - right0 - pre.length);
+            else
+                pre += ' ';
+
+            if(typeof(opt.default_print) === 'undefined' && opt.dflt) {
+                if(opt.type === 'string')
+                    var dflt = ' The default value of ' +
+                        opt.argument + ' is "' + opt.dflt + '".';
+                else if(opt.type === 'number')
+                    var dflt = ' The default value of ' +
+                        opt.argument + ' is ' + opt.dflt + '.';
+                else if(opt.type === 'regexp')
+                    var dflt = ' The default value of ' +
+                        opt.argument + ' is /' + opt.dflt + '/.';
+                else // if(opt.type === 'bool')
+                    var dflt = ' This is not set by default.';
+            } else {
+                var dflt = '';
+            }
+
+            print(pre + options[keys[i]].help + dflt, right0, right1);
+            write("\n");
+        }
+
+        process.exit(1);
+    }
+
     var keys = Object.keys(options);
     var alen = process.argv.length;
 
@@ -166,9 +255,37 @@ function parseOptions() {
             opt.value = false;
             continue;
         }
-        if(type === 'string' && opt.dflt)
-            opt.value = opt.dflt;
+        if(type === 'string' || type === 'regexp' || type === 'number') {
+            if(opt.dflt)
+                opt.value = opt.dflt;
+            else
+                opt.value = '';
+            
+            if(opt.eat && opt.eat > 1) {
+                if(typeof(opt.seperator) === 'undefined')
+                    opt.seperator = default_seperator;
+                if(typeof(opt.dflt) != 'array')
+                    opt.value = [];
+                else
+                    opt.value = opt.dflt;
+            } else
+                opt.eat = 1;
+
+            if(!opt.argument)
+                opt.argument = name.toUpperCase();
+
+            continue;
+        }
+        error = 'bad option parsing opbject with name: ' + name;
+        process.exit(1);
     }
+
+    ///////////////// TO REMOVE ///////////////////////////
+    console.log('============ default option values =============');
+    for(var j=0; j<keys.length; ++j)
+         console.log('  ' + j + ' ' + keys[j] + '=' +  options[keys[j]].value);
+    console.log('================================================');
+
 
     for(var i=2; i < alen; ++i) {
         var arg = process.argv[i];
@@ -176,41 +293,45 @@ function parseOptions() {
             var name = keys[k];
             var opt = options[name];
             var type = opt.type;
-            console.log(name);
-            if(type && type == 'string') {
+            //console.log(name);
+            if(type === 'string' || type === 'regexp' || type === 'number') {
                 if(('--'+name === arg || '-'+name === arg) && alen > i+1) {
                     // --option val   -option val
-                    var l = (opt.eat && typeof(opt.eat) === 'number')?opt.eat:1;
-                    if(l === 1)
-                        opt.value = process.argv[++i];
-                    else if(alen > i + l) {
-                        opt.value = [];
-                        while(l--)
-                            opt.push(process.argv[++i])
+                    arg = process.argv[++i];
+                    if(opt.eat === 1)
+                        opt.value = arg;
+                    else {
+                        // Getting multiple values into an array of values
+                        // --option val0 --option val1 --option val2 ...
+                        // or
+                        // --option "val0 val1 val2"
+                        var a = arg.split(opt.seperator)
+                        opt.value = opt.value.concat(a);
                     }
-                    break;
+                    break; // got it
                 }
+
                 var optlen = arg.indexOf('=') + 1;
                 if(optlen > 0 && ('--'+name+'=' === arg.substr(0,optlen) ||
                             '-'+name+'=' === arg.substr(0, optlen)) &&
                             arg.length > optlen) {
-                    // --option=val   -option=val
-                    var l = (opt.eat && typeof(opt.eat) === 'number')?opt.eat:1;
-                    if(l === 1) {
+                    if(opt.eat === 1) {
                          opt.value = arg.substr(optlen);
-                    } else if(alen > i + l-1) {
-                        // like  % program --option=val0 val2
-                        // which is kind of strange
-                        opt.value = [];
-                        opt.push(arg.substr(optlen));
-                        l--;
-                        while(l--)
-                            opt.push(process.argv[++i]);
+                    } else {
+                        // Getting multiple values into an array of values
+                        // --option=val0 --option=val1 --option=val2 ...
+                        // or
+                        // --option="val0 val1 val2"
+                        // or
+                        // "--option=val0 val1 val2"
+                        var a = arg.substr(optlen).split(opt.seperator);
+                        opt.value = opt.value.concat(a);
                     }
                     break;
                 }
                 // TODO: add short options like the list command 'ls -al'
             }
+
             if(type && type == 'bool') {
                 if('--'+name === arg || '-'+name === arg) {
                     // --option  -option
@@ -219,37 +340,114 @@ function parseOptions() {
                 }
             }
         }
-        if(k === keys.length) {
-            if(error.length > 0)
-                error += ' ' + arg;
-            else
-                error = 'unknown option(s): ' + arg;
+        if(k === keys.length) 
+            addError(arg);
+    }
+
+    // Check that array values are either 0 length or the eat length
+    for(var j=0; j<keys.length; ++j) {
+        var key = keys[j];
+        var opt = options[key];
+        if(opt.eat > 1 &&
+                (opt.value.length != 0 && opt.value.length != opt.eat))
+            addError(key + ' got ' + opt.value.length +
+                    ' values, needed ' + opt.eat);
+    }
+
+
+    // now parse the environment
+    for(var j=0; j<keys.length; ++j) {
+        var key = keys[j];
+        var name = environment_prefix + key.toUpperCase();
+        var env = process.env[name];
+        if(env) {
+            var opt = options[key];
+            if(opt.type === 'string' || opt.type === 'regexp'
+                    || opt.type === 'number') {
+                if(opt.eat === 1)
+                    opt.value = env;
+                else /* if(eat > 1) */ {
+                    opt.value = env.split(opt.seperator);
+                    if(opt.value.length < opt.eat)
+                        addError('env: ' + name + '=' + env);
+                }
+            }
+            if(opt.type === 'bool') {
+                // Default to true unless it's a false thing like '0' or
+                // 'no' etc...
+                opt.value = true;
+                if(/(f|F|n|N|0).*/.test(env))
+                    opt.value = false;
+            }
         }
     }
 
-
-    console.log("program options:\n------------------------");
-    // Test that it worked by printing options
+    // Now convert the options that are numbers from strings to numbers
+    // and the regexp from strings to regexp.
     for(var j=0; j<keys.length; ++j) {
-        var opt = options[keys[j]];
-        console.log(keys[j] + '=' + opt.value);
+        var key = keys[j];
+        var opt = options[key];
+        if(opt.type === 'number') {
+            if(opt.eat === 1) {
+                opt.value = parseInt(opt.value);
+            } else {
+                for(var i=0; i<opt.value.length; ++i)
+                    opt.value[i] = parseInt(opt.value[i]);
+            }
+        }
+        else if(opt.type === 'regexp') {
+            if(opt.value.substr(0,1) == '/')
+                opt.value = opt.value.substr(1);
+            if(opt.value.substr(opt.value.length-1,1) == '/')
+                opt.value = opt.value.substr(0, opt.value.length-1);
+            opt.value = new RegExp(opt.value);
+        }
+
     }
-    console.log("---------------------------\n");
 
     if(error.length > 0) {
         console.log(error + "\n\n");
-        usage();
+        options.help.value = true;
     }
-
 
     if(options.help.value)
         usage();
 
+    var ret = {}; // returned option values
     // trash all the options data leaving just the values
-    for(var j=0; j<keys.length; ++j) {
-        opt[keys[i]] = options[keys[j]].value;
-    }
+    for(var j=0; j<keys.length; ++j)
+        ret[keys[j]] = options[keys[j]].value;
+
+    ret.program_name = program_name;
+
+    return ret;
 }
 
-parseOptions();
+
+var path = require('path');
+
+var opt = parseOptions(path);
+
+// opt and path are the other two things that
+// are needed a this point
+
+
+
+//////////////////////////////////////////
+// BEGIN TO REMOVE later
+//////////////////////////////////////////
+// test print
+function testPrint() {
+    var keys = Object.keys(opt);
+
+    console.log('============== ' + keys.length +
+        ' options =====================');
+    for(var j=0; j<keys.length; ++j)
+        console.log(' ' + j + ' ' + keys[j] + '=' + opt[keys[j]].toString());
+    console.log('=============================================');
+}
+testPrint();
+//////////////////////////////////////////
+//   END TO REMOVE later
+//////////////////////////////////////////
 

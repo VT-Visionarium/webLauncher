@@ -182,6 +182,8 @@ function launch(t)
 
     setTagToPostLaunch(tag);
 
+    //alert('launch ' + tag.id);
+    
     xhttp.onreadystatechange = function() {
         if (xhttp.readyState == 4 && xhttp.status == 200) {
 
