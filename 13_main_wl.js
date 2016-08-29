@@ -620,7 +620,8 @@ function run(relPath, response) {
             {
                 cwd: path.dirname(fullPath),
                 detached: true,
-                stdio: [0,1,2],
+                //stdio: [0,1,2],
+                stdio: 'ignore',
                 env: env
             }
         );
@@ -665,7 +666,7 @@ function run(relPath, response) {
 
     socketsSend(JSON.stringify(launch.json));
 
-    child.on('close', (code) => {
+    child.on('exit', (code) => {
         console.log(launch.json.relPath + ' pid=' +
             child.pid + ' exited with status code=' + code);
         sendDeadToSockets(launch);
@@ -677,7 +678,7 @@ function run(relPath, response) {
             launch = getLauncher(nextRelPath);
             if(launch.runNext)
                 delete launch.runNext; 
-            run(nextRelPath);
+            run(nextRelPath, false);
         }
     });
 }
@@ -721,12 +722,12 @@ function httpRequest(request, response) {
     }
 
 
-    if(stats && parse.query == 'run') {
+    if(stats && /^run/.test(parse.query)) {
         /////////////////////////////////////
         //////////// Run fpath //////////////
         /////////////////////////////////////
-        
-        // Check for waiting jobs
+
+        // First check for waiting jobs
         var relPath = path.join('/',parse.pathname);
         var launch = getLauncher(relPath);
 
@@ -761,8 +762,9 @@ function httpRequest(request, response) {
             ASSERT(otherLaunch, 'launcher for URI: ' +
                     relPathRunning + ' was not found');
             otherLaunch.runNext = relPath;
+            response.write(JSON.stringify({state: 'waiting'}));
+            response.end();
             console.log('server queued to run: ' + fpath);
-
             try {
                 console.log("killing " + relPathRunning);
                 otherLaunch.child.kill('SIGINT');

@@ -165,6 +165,7 @@ function setTagToPostLaunch(tag)
     launchChangeText(tag, "Starting (" + runCount + ')');
 }
 
+
 function launch(t)
 {
     if(arguments.length > 0 && t.nodeName)
@@ -194,7 +195,11 @@ function launch(t)
 
             if(tag.State.state == 'running')
                 setTagToRunning(tag);
-            else {
+            else if(tag.State.state == 'waiting') {
+                // The server is waiting for an incompatible process to
+                // exit, so do nothing now, we'll get a reply from the Web
+                // Socket later.  The state is still "starting".
+            } else {
                 alert('Failed to run: ' + tag.id);
                 setTagToLaunch(tag);
             }
