@@ -41,7 +41,7 @@ run:
 
 <pre>
 make &&\
- ./webLauncher testDocRoot/ &
+ ./webLauncher &
  # wait for the server to start
  while ! nc -z  localhost 8080;do echo "waiting";sleep 0.3;done
  firefox http://localhost:8080/
