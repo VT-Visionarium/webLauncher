@@ -8,8 +8,15 @@ webLauncher on a particular computer and then any web browser can launch
 programs on that computer.  The network connections are secured via TLS
 and the browser authenticates via passcode and cookies.
 
+Currently this is only ported to GNU/Linux, Xubuntu 14.04.
 
-## Quick Install and Demo
+## Quick Demo
+
+In an interactive bash shell run:
+
+<pre>make && ./webLauncher</pre>
+
+In a web browser go to the URL printed.  Click away.
 
 ### Prerequisite Software
 

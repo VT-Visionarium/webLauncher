@@ -20,13 +20,70 @@ function parseOptions(path) {
     // The options list is longer than the code that parses the options.
     var options = {
 
-    title: {
-        type: 'string', dflt: 'Demos',
-        help: 'set the page title text to TITLE.'
+    catch_signal: {
+        type: 'string', argument: 'SIG',
+        help: 'catch signal SIG to exit.  Catchs the signal and then ' +
+            'cleanly exits. This is handy to use with the ' +
+            '--kill_children option.  Example: ' +
+            '--catch_signals SIGINT . ' +
+            'By default termial signals cause the server' +
+            ' to terminate immediately with no catcher function. ' +
+            'Not all signals are supported in nodejs ' +
+            '(SIGINT,SIGQUIT,SIGTERM are).',
+        // TODO: parse with this in mind make this get an array of
+        // strings:
+        array: [0, 64] // range 0 to 64 signals may be set
+    },
+    // User configuration/setting dir
+    config_dir: {
+        type: 'string', dflt: path.join(process.env.HOME, '.' +
+                      program_name),
+        help: 'set the server configuration and settings directory. ' +
+            'The default value of CONFIG_DIR is ${HOME}' +
+            path.sep + '.' + program_name + '.'
+    },
+    detach: {
+        type: 'bool',
+        help: 'detach the launched programs from the server ' +
+            'process.'
+    },
+    dir_icon: {
+        type: 'regexp', dflt: '^dir_icon.*\\.(png|jpg|JPG)',
+        help: 'match this to find directory icon images.'
+    },
+    dir_txt: {
+        type: 'regexp', dflt: 'dir_description\\.txt',
+        help: 'match this to find directory descriptions in simple text'
+    },
+    exit_on_last: {
+        type: 'number', dflt: -1, // -1 is off
+        argument: 'MILLI_SECS',
+        help: 'have server exit after last connection closes.' +
+            ' MILLI_SECS is the time to wait after the last ' +
+            'connection is closed. MILLI_SECONDS is -1 for not ' +
+            'exiting on last connection close.'
+    },
+    foot: {
+        type: 'string', dflt: 'foot.htm',
+        help: '(ADVANCED) set the launch pages suffix HTML text that' +
+            ' is at the bottom of every launcher page. ' +
+            'If the full path is not given the search path will start' +
+            ' at the installation prefix in the etc sub-directory.'
+    },
+    head: {
+        type: 'string', dflt: 'head.htm',
+        help: '(ADVANCED) set the launch pages prefix HTML text that' +
+            ' is at the top of every launcher page. ' +
+            'If the full path is not given the search path will start' +
+            ' at the installation prefix in the etc sub-directory.'
     },
     heading: {
         type: 'string', dflt: 'Demos',
         help: 'set <h1> page heading text to HEADING.'
+    },
+    help: {
+        type: 'bool',
+        help: 'print this help.'
     },
     http_port: {
         type: 'string', dflt: '8080',
@@ -39,41 +96,43 @@ function parseOptions(path) {
         type: 'string', dflt: '8383',
         help: 'set the server HTTPS port to HTTPS_PORT.'
     },
-    exit_on_last: {
-        type: 'number', dflt: -1, // -1 is off
-        argument: 'MILLI_SECS',
-        help: 'have server exit after last connection closes.' +
-            ' MILLI_SECS is the time to wait after the last ' +
-            'connection is closed. MILLI_SECONDS is -1 for not ' +
-            'exiting on last connection close.'
+    kill_children: {
+        type: 'bool', dflt: false,
+        help: 'kill all launched children on exiting the server.'
+    },
+    main_menu: {
+        type: 'string', dflt: 'main_menu',
+        help: 'set the name of the main menu directory.'
     },
     on_exit: {
         type: 'string',
         help: 'run PROGRAM just before the server exits.',
         argument: 'PROGRAM' // as in --on_exit=PROGRAM
     },
-    kill_children: {
-        type: 'bool', dflt: false,
-        help: 'kill all launched children on exiting the server.'
-    },
     passcode: {
         type: 'string',
         help: 'set client passcode to PASSCODE, if set the initial URL' +
             ' for the service should be appended with something like:' +
             ' https://example.com/?passcode=PASSCODE' +
-            ' after which additional client requests will be secured with' +
-            ' cookies.'
+            ' after which additional client requests will be secured' +
+            ' with cookies.'
     },
-    catch_signal: {
-        type: 'string', argument: 'SIG',
-        help: 'catch signal SIG to exit.  Catchs the signal and then cleanly exits.' +
-            ' This is handy to use with the --kill_children option.  Example: ' +
-            '--catch_signals SIGINT .  By default termial signals cause the server' +
-            ' to terminate immediately with no catcher function. ' +
-            'Not all signals are supported in nodejs (SIGINT,SIGQUIT,SIGTERM are).',
-        // TODO: parse with this in mind make this get an array of
-        // strings:
-        array: [0, 64] // range 0 to 64 signals may be set
+    root_dir: {
+        type: 'string', dflt: process.cwd(),
+        help: 'set the servers root document directory.  The default ' +
+            'ROOT_DIR is the current working directory this program ran from.'
+    },
+    run_icon: { // TODO: change this and tests and CAVE files
+        type: 'regexp', dflt: '^launcherIcon.*\\.(png|jpg|JPG)',
+        help: 'match this to find launch image icons.'
+    },
+    run_script: {
+        type: 'regexp', dflt: '(.*_|)run',
+        help: 'match this to find the files to be launched.'
+    },
+    run_txt: {
+        type: 'string', dflt: 'description.txt',
+        help: 'match this to find launch descriptions in simple text.'
     },
     signal: {
         type: 'string', seperator: ',',
@@ -89,65 +148,9 @@ function parseOptions(path) {
         help: 'signal the process with PID with signal SIG just after the' +
             ' listening sockets are open.  Example: --signal USR1,2354.'
     },
-    // User configuration/setting dir
-    config_dir: {
-        type: 'string', dflt: path.join(process.env.HOME, '.' + program_name),
-        help: 'set the server configuration and settings directory. ' +
-            'The default value of CONFIG_DIR is ${HOME}' +
-            path.sep + '.' + program_name + '.'
-    },
-    head: {
-        type: 'string', dflt: 'head.htm',
-        help: '(ADVANCED) set the launch pages prefix HTML text that' +
-            ' is at the top of every launcher page. ' +
-            'If the full path is not given the search path will start' +
-            ' at the installation prefix in the etc sub-directory.'
-    },
-    foot: {
-        type: 'string', dflt: 'foot.htm',
-        help: '(ADVANCED) set the launch pages suffix HTML text that' +
-            ' is at the bottom of every launcher page. ' +
-            'If the full path is not given the search path will start' +
-            ' at the installation prefix in the etc sub-directory.'
-    },
-    root_dir: {
-        type: 'string', dflt: process.cwd(),
-        help: 'set the servers root document directory.  The default ' +
-            'ROOT_DIR is the current working directory this program ran from.'
-    },
-    //////////////////////////////////////////////////////////////////////
-    //            file types
-    //  kind-of like MIME type for webLauncher
-    //  The user can configure them though this options interface.
-    //  We define them by javaScript regular expression match.
-    //////////////////////////////////////////////////////////////////////
-    run_script: {
-        type: 'regexp', dflt: '(.*_|)run',
-        help: 'match this to find the files to be launched.'
-    },
-    run_txt: {
-        type: 'string', dflt: 'description.txt',
-        help: 'match this to find launch descriptions in simple text.'
-    },
-    run_icon: { // TODO: change this and tests and CAVE files
-        type: 'regexp', dflt: '^launcherIcon.*\\.(png|jpg|JPG)',
-        help: 'match this to find launch image icons.'
-    },
-    main_menu: {
-        type: 'string', dflt: 'main_menu',
-        help: 'set the name of the main menu directory.'
-    },
-    dir_txt: {
-        type: 'regexp', dflt: 'dir_description\\.txt',
-        help: 'match this to find directory descriptions in simple text'
-    },
-    dir_icon: {
-        type: 'regexp', dflt: '^dir_icon.*\\.(png|jpg|JPG)',
-        help: 'match this to find directory icon images.'
-    },
-    help: {
-        type: 'bool',
-        help: 'print this help.'
+    title: {
+        type: 'string', dflt: 'Demos',
+        help: 'set the page title text to TITLE.'
     }
     };
 

@@ -617,9 +617,8 @@ function run(relPath, response) {
         var child = child_process.spawn(fullPath, 
             {
                 cwd: path.dirname(fullPath),
-                detached: true,
+                detached: opt.detach,
                 stdio: [0,1,2],
-                stdio: 'ignore',
                 env: env
             }
         );
@@ -1080,7 +1079,7 @@ else
             '/?passcode=' + opt.passcode);
 
 if(server)
-    console.log("          and locally  => http://localhost:" +
+    console.log("           and locally  => http://localhost:" +
         opt.http_port);
 
 
