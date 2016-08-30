@@ -586,8 +586,6 @@ function config() {
 
     // Report
     console.log('Document root is ' + opt.root_dir);
-    console.log('HTTPS server Port is ' + opt.https_port);
-    console.log('localhost HTTP server Port is ' + opt.http_port);
 }
 
 
@@ -620,7 +618,7 @@ function run(relPath, response) {
             {
                 cwd: path.dirname(fullPath),
                 detached: true,
-                //stdio: [0,1,2],
+                stdio: [0,1,2],
                 stdio: 'ignore',
                 env: env
             }
@@ -869,8 +867,9 @@ function httpRequest(request, response) {
     }
 }
 
-// The http server
-var server = http.createServer(httpRequest).listen(opt.http_port, 'localhost');
+// The optional http server, is on by default.
+if(opt.http_port != '0')
+    var server = http.createServer(httpRequest).listen(opt.http_port, 'localhost');
 
 // Just adding one argument is the difference between http and https :)
 // For the https server
@@ -1063,8 +1062,10 @@ function ws_OnConnection(socket) {
 // This server shares the same port as the https server;
 // some data in the message header tells it what to do.
 (new ws({server: sserver})).on('connection', ws_OnConnection);
-// This server shared with the http server; ya.
-(new ws({server: server})).on('connection', ws_OnConnection);
+
+if(server)
+    // This server shared with the http server; ya.
+    (new ws({server: server})).on('connection', ws_OnConnection);
 
 
 
@@ -1078,7 +1079,8 @@ else
             require('os').hostname() + ":" + opt.https_port +
             '/?passcode=' + opt.passcode);
 
-console.log("          and locally  => http://localhost:" +
+if(server)
+    console.log("          and locally  => http://localhost:" +
         opt.http_port);
 
 
@@ -1092,4 +1094,13 @@ if(opt.signal.length >= 1)
                 opt.signal[1] + ' failed');
     }
 }
+
+
+
+if(opt.catch_signal.length > 0)
+    process.on(opt.catch_signal, () => {
+        console.log('Received ' + opt.catch_signal +
+            '.  Cleaning up.');
+        exit();
+    });
 

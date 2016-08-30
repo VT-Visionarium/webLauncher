@@ -30,7 +30,10 @@ function parseOptions(path) {
     },
     http_port: {
         type: 'string', dflt: '8080',
-        help: 'set the server HTTP port to HTTP_PORT.'
+        help: 'set the server HTTP port to HTTP_PORT. ' +
+            'The HTTP (non-secure) service is only available ' +
+            'to localhost. Setting the HTTP_PORT to "0" will ' +
+            'disable this HTTP service.'
     },
     https_port: {
         type: 'string', dflt: '8383',
@@ -61,11 +64,22 @@ function parseOptions(path) {
             ' after which additional client requests will be secured with' +
             ' cookies.'
     },
+    catch_signal: {
+        type: 'string', argument: 'SIG',
+        help: 'catch signal SIG to exit.  Catchs the signal and then cleanly exits.' +
+            ' This is handy to use with the --kill_children option.  Example: ' +
+            '--catch_signals SIGINT .  By default termial signals cause the server' +
+            ' to terminate immediately with no catcher function. ' +
+            'Not all signals are supported in nodejs (SIGINT,SIGQUIT,SIGTERM are).',
+        // TODO: parse with this in mind make this get an array of
+        // strings:
+        array: [0, 64] // range 0 to 64 signals may be set
+    },
     signal: {
         type: 'string', seperator: ',',
         default_print: false, // Do no print "The default value is bla bla"
         // in the help.
-        eat: 2, // consumes 2 arguments making 2 strings
+        len: 2, // consumes 2 arguments making 2 strings
         // example: "--signal=USR1 2314"
         // separator: ' '  is the default.  It separates USR1 and 2314
         argument: 'SIG,PID',
@@ -73,7 +87,7 @@ function parseOptions(path) {
         // or -signal USR1 2314 or --signal USR1,2314
         // or --signal=USR1,2314  all would work
         help: 'signal the process with PID with signal SIG just after the' +
-            'listening sockets are open.  Example: --signal USR1,2354.'
+            ' listening sockets are open.  Example: --signal USR1,2354.'
     },
     // User configuration/setting dir
     config_dir: {
@@ -261,7 +275,7 @@ function parseOptions(path) {
             else
                 opt.value = '';
             
-            if(opt.eat && opt.eat > 1) {
+            if(opt.len && opt.len > 1) {
                 if(typeof(opt.seperator) === 'undefined')
                     opt.seperator = default_seperator;
                 if(typeof(opt.dflt) != 'array')
@@ -269,7 +283,7 @@ function parseOptions(path) {
                 else
                     opt.value = opt.dflt;
             } else
-                opt.eat = 1;
+                opt.len = 1;
 
             if(!opt.argument)
                 opt.argument = name.toUpperCase();
@@ -298,7 +312,7 @@ function parseOptions(path) {
                 if(('--'+name === arg || '-'+name === arg) && alen > i+1) {
                     // --option val   -option val
                     arg = process.argv[++i];
-                    if(opt.eat === 1)
+                    if(opt.len === 1)
                         opt.value = arg;
                     else {
                         // Getting multiple values into an array of values
@@ -315,7 +329,7 @@ function parseOptions(path) {
                 if(optlen > 0 && ('--'+name+'=' === arg.substr(0,optlen) ||
                             '-'+name+'=' === arg.substr(0, optlen)) &&
                             arg.length > optlen) {
-                    if(opt.eat === 1) {
+                    if(opt.len === 1) {
                          opt.value = arg.substr(optlen);
                     } else {
                         // Getting multiple values into an array of values
@@ -344,14 +358,14 @@ function parseOptions(path) {
             addError(arg);
     }
 
-    // Check that array values are either 0 length or the eat length
+    // Check that array values are either 0 length or the len length
     for(var j=0; j<keys.length; ++j) {
         var key = keys[j];
         var opt = options[key];
-        if(opt.eat > 1 &&
-                (opt.value.length != 0 && opt.value.length != opt.eat))
+        if(opt.len > 1 &&
+                (opt.value.length != 0 && opt.value.length != opt.len))
             addError(key + ' got ' + opt.value.length +
-                    ' values, needed ' + opt.eat);
+                    ' values, needed ' + opt.len);
     }
 
 
@@ -364,11 +378,11 @@ function parseOptions(path) {
             var opt = options[key];
             if(opt.type === 'string' || opt.type === 'regexp'
                     || opt.type === 'number') {
-                if(opt.eat === 1)
+                if(opt.len === 1)
                     opt.value = env;
-                else /* if(eat > 1) */ {
+                else /* if(len > 1) */ {
                     opt.value = env.split(opt.seperator);
-                    if(opt.value.length < opt.eat)
+                    if(opt.value.length < opt.len)
                         addError('env: ' + name + '=' + env);
                 }
             }
@@ -388,21 +402,19 @@ function parseOptions(path) {
         var key = keys[j];
         var opt = options[key];
         if(opt.type === 'number') {
-            if(opt.eat === 1) {
+            if(opt.len === 1) {
                 opt.value = parseInt(opt.value);
             } else {
                 for(var i=0; i<opt.value.length; ++i)
                     opt.value[i] = parseInt(opt.value[i]);
             }
-        }
-        else if(opt.type === 'regexp') {
+        } else if(opt.type === 'regexp') {
             if(opt.value.substr(0,1) == '/')
                 opt.value = opt.value.substr(1);
             if(opt.value.substr(opt.value.length-1,1) == '/')
                 opt.value = opt.value.substr(0, opt.value.length-1);
             opt.value = new RegExp(opt.value);
         }
-
     }
 
     if(error.length > 0) {
