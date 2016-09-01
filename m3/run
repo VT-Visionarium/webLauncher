@@ -1,0 +1,4 @@
+#!/bin/bash
+
+echo "$0 is running and will exit now."
+exit 1

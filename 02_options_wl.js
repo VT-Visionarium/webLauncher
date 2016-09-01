@@ -3,17 +3,12 @@
 function parseOptions(path) {
 
     //////////////////////////////////////////////////////////////////////
-    //     BEGIN parseOptions() CONFIGURATION
+    //     BEGIN parseOptions() options CONFIGURATION
     //////////////////////////////////////////////////////////////////////
 
     var default_seperator = ',';
     var program_name = 'webLauncher';
 
-    var usage_text = 'Run a ' + program_name + ' HTTP/webSocket server. ' +
-        program_name +
-        ' is a nodejs web server that provides a program launcher' +
-        ' service using HTTP, HTTPS, Web Sockets and Web Sockets' +
-        ' over TLS.';
 
     var environment_prefix = program_name.toUpperCase() + '_';
     
@@ -120,7 +115,8 @@ function parseOptions(path) {
     root_dir: {
         type: 'string', dflt: process.cwd(),
         help: 'set the servers root document directory.  The default ' +
-            'ROOT_DIR is the current working directory this program ran from.'
+            'ROOT_DIR is the current working directory this program ' +
+            'ran from.'
     },
     run_icon: { // TODO: change this and tests and CAVE files
         type: 'regexp', dflt: '^launcherIcon.*\\.(png|jpg|JPG)',
@@ -155,7 +151,7 @@ function parseOptions(path) {
     };
 
     //////////////////////////////////////////////////////////////////////
-    //       END parseOptions() CONFIGURATION
+    //       END parseOptions() options CONFIGURATION
     //////////////////////////////////////////////////////////////////////
 
     var error = '';
@@ -207,19 +203,24 @@ function parseOptions(path) {
     function usage() {
 
         write('  Usage: ' + program_name + " [OPTIONS]\n\n");
-        print(usage_text, 2);
+        print('Run a ' + program_name + ' HTTP/webSocket server. ' +
+            program_name +
+            ' is a nodejs web server that provides a program launcher' +
+            ' service using HTTP, HTTPS, Web Sockets and Web Sockets' +
+            ' over TLS.', 2);
         write("\n");
-
         print(
             'The following options may be set using the command line ' +
             'or via an environment variable with a with the name being ' +
             'prefixed with ' + environment_prefix + ' and in all caps ' +
-            'like for example:', 2);
-
+            'like for example (bash shell):', 2);
         write("\n      " + environment_prefix + 'TITLE="Cool Examples" ' +
                 program_name + "\n\n");
 
-        print('will set the --title option to "Cool Examples"', 2);
+        print('will set the --title option to "Cool Examples".' +
+                ' These options may also be set using a single dash ' +
+                ' and with or without \'=\' as in for example:' +
+                ' -title="Cool Examples" or -title "Cool Examples".', 2);
 
         write("\n\n                 --------- OPTIONS --------\n\n");
 
