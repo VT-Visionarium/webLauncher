@@ -683,6 +683,14 @@ function run(relPath, response) {
 
 function httpRequest(request, response) {
 
+    function notFound(response, err) {
+        response.writeHead(500, {"Content-Type": "text/plain"});
+        response.write(err + "\n");
+        response.end();
+        console.log(fpath + ' not found ' + err);
+    }
+
+
     function getContentType(file) {
 
         var suffix = {
@@ -776,19 +784,27 @@ function httpRequest(request, response) {
         /////////////////////////////////////
         ////////// Files from etc/   ////////
         /////////////////////////////////////
+
+        if(! /(\.js$|\.png$|\.css$)/.test(parse.pathname)) {
+            // Do not send just any file from in etc/
+            notFound(response, parse.pathname + ' was not found');
+            return;
+        }
+
+        // Send files from the servers configuration
+        // directory.
         fpath = path.join(etcDir, parse.pathname);
 
         fs.readFile(fpath, "binary", function(err, file) {
             if(err) {
-                response.writeHead(500, {"Content-Type": "text/plain"});
-                response.write("err=" +  err + "\n");
-                response.end();
-                console.log(fpath + ' not found ' + err);
+                notFound(response, err);
+                return;
             } else {
                 response.writeHead(200, { 'Content-Type': getContentType(fpath) });
                 response.write(file, "binary");
                 response.end();
                 console.log('sent file: ' + fpath);
+                return;
             }
         });
     } else if(stats && stats.isDirectory()) {
@@ -803,11 +819,8 @@ function httpRequest(request, response) {
         //////////// Sent a file ////////////
         /////////////////////////////////////
         fs.readFile(fpath, "binary", function(err, file) {
-            if(err) {        
-                response.writeHead(500, {"Content-Type": "text/plain"});
-                response.write("err=" +  err + "\n");
-                response.end();
-                console.log(fpath + ' not found ' + err);
+            if(err) {
+                notFound(response, err)
             } else {
                 response.writeHead(200, { 'Content-Type': getContentType(fpath) });
                 response.write(file, "binary");
@@ -844,16 +857,21 @@ function httpRequest(request, response) {
 
     response.end();
 
-   } else if(parse.query && parse.query.length > 1 && parse.pathname == '/QUIT') {
+   } else if(parse.pathname == '/QUIT') {
     /////////////////////////////////////
     //////////////  QUIT  ///////////////
     /////////////////////////////////////
 
+    // This is so that wget can sent a quit command with http://localhost
+    // or via https://host:port/QUIT?passcode=PASSCODE.
+    //
+    // A better way may be to use signals and set the --catch_signal SIG
+    // option.
+    // The client browsers send a quit command via Web Sockets.
     console.log("GOT QUIT command");
     response.writeHead(200, { 'Content-Type': "text/plain" });
     response.write("\n\n\nSERVER EXITING\n\n\n");
     response.end();
-
     exit();
 
     } else {
