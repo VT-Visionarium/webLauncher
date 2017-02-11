@@ -67,15 +67,17 @@ web service, making configuration of the service very straight forward,
 and on-the-fly.  It's a web based file browser that restricts the function
 to that of just running programs, with additional descriptions and state
 information.  User just need to make a directory with programs in it.
-The web server uses this directory as its server root.
+The web server uses this directory as its server web document root.
 
 ## Results
 
 We got more than we needed, because web servers and web browsers are very
 highly evolved things now-a-days.  This beats the crap out of a single
-process GUI app written with a GUI widget API.  Since most of the time
-people are using web browsers anyway, there's not a big cost to doing it
-this way.
+process GUI app (application program) written with a GUI widget API.
+Since most of the time people are using web browsers anyway, there's not a
+big cost to doing it this way.  Now you can run your server computer apps
+(application programs) from the browser on you phones, tablets, or any web
+browser.
 
 
 ## Ports
@@ -85,7 +87,7 @@ this way.
 The current development platform is GNU/Linux, Xubuntu 14.04.  We expect
 that other GNU/Linux systems should work.
 
-We plan to port to Windoz and Mac OSX.
+We plan to port to Windoz and Mac OSX.  node JS makes that easy.
 
 
 ### Browsers
@@ -126,7 +128,7 @@ relatively cumbersome, compared to the "make" method.
 
 <b>scope of this project:</b>
 This package is not intended to be large. Name space conflicts will not
-be a problem.  Do not over engineer this code.
+be a problem.  Do not over engineer this code. 
 
 <b>server initialization:</b> There's not much to gain by adding more code
 to make the startup of the server more asynchronous in nature, and
@@ -161,10 +163,13 @@ another.
 Evolve this into a launcher protocol layer that sits on http/https and
 ws/wss to provide program launch service.  Make it a nodejs module that
 extends the nodejs grouped ws(s) server by protocol extension in a similar
-way in that ws extends http.
+way in that ws or http is built on TCP/IP, or wss and https are built on
+TLS.
 
-Consider adding mime types based on file suffix and/or prefix.
+Consider adding mime types based on file suffix and/or prefix.  Currently
+the file types are defined by a general javaScript regular expression that
+the user may define at server launch time.
 
 How does this extend the read only file browser which a web browser is
-for the file:// protocol.
+for the file:// protocol?
 
