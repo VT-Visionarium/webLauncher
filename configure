@@ -1,10 +1,14 @@
 #!/bin/bash
 
+scriptdir="$(dirname $0)" || exit $?
+cd "$scriptdir" || exit $?
+scriptdir="$PWD"
+
 #######################################################
 #      configure
 #######################################################
 
-default_prefix=/usr/local/encap/webLauncher
+default_prefix="$scriptdir/installed"
 
 #######################################################
 #
@@ -27,10 +31,6 @@ default_prefix=/usr/local/encap/webLauncher
 # if the installed files move.
 #######################################################
 
-
-scriptdir="$(dirname $0)" || exit $?
-cd "$scriptdir" || exit $?
-scriptdir="$PWD"
 
 default_shabang='#!/usr/bin/env node'
 shabang="$default_shabang"
@@ -57,12 +57,12 @@ function usage()
                        will be #!NPATH
 
   --prefix PREFIX      set the installation directory prefix
-                       the default PREFIX is $default_prefix
+                       the current default PREFIX is $default_prefix
 
 
   For example in bash run:
 
-     ./configure --prefix=$default_prefix && make && make install
+     ./configure --prefix=/usr/local/packageXXX && make && make install
 
 
 EOF

@@ -1,7 +1,5 @@
 var
 
-    // We use a separate port for the web sockets
-    // so that the code has less chance of braking.
     https = require('https'),
     http = require('http'),
     querystring = require('querystring'),
