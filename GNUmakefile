@@ -26,8 +26,9 @@ keys = etc/key.pem etc/cert.pem
 built_files = $(sort\
  $(built_js_files)\
  $(built_css_files)\
- $(keys) node_modules)\
- webLauncher
+ $(keys)\
+ node_modules/ws\
+ webLauncher)
 
 sep = ////////////////////////////////////////////\n
 
@@ -54,7 +55,7 @@ webLauncher: $(webLauncher_sources)
 	chmod 755 $@
 
 # We npm install a copy of ws
-node_modules:
+node_modules/ws:
 	npm install $(WS)
 
 # ref: http://superuser.com/questions/226192/openssl-without-prompt
@@ -81,11 +82,11 @@ mkdirs:
 install: mkdirs build
 	cp  -r $(etc_files) $(ETC)/
 	cp webLauncher $(BIN)/
-	cp -r node_modules $(BIN)/
+	cp -r node_modules/ $(BIN)/
 
 clean:
-	rm -rf node_modules config.make $(built_files)
+	rm -rf node_modules/[a-z]* $(built_files) package-lock.json
 
-distclean: clean
+distclean cleaner: clean
 	rm -f config.make
 

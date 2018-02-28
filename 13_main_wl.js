@@ -708,7 +708,7 @@ function httpRequest(request, response) {
         return "text/plain";
     }
 
-    console.log('accepted connection from address: ' +
+    console.log('accepted HTTP connection from address: ' +
             request.connection.remoteAddress);
 
     var parse =  url.parse(request.url);
