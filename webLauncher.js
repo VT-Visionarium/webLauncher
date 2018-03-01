@@ -1,12 +1,15 @@
+#!/usr/bin/env node
+
 var
 
+    opt = require('./options').opt,
+    path = require('path'),
     // We use a separate port for the web sockets
     // so that the code has less chance of braking.
     https = require('https'),
     http = require('http'),
     querystring = require('querystring'),
     child_process = require('child_process'),
-    dns = require('dns'),
     url = require('url'),
     fs = require('fs'),
     util = require('util'),
@@ -25,7 +28,6 @@ var
     // the programs to next before running the next one.
     running_programs = { }, // objects = { program_filename: relPath }
 
-
 //////////////////////////////////////////////////////////////////////
 //         Supporting Files
 //////////////////////////////////////////////////////////////////////
@@ -41,6 +43,10 @@ var
     etcDir = '';
 
 //////////////////////////////////////////////////////////////////////
+
+
+console.log("opt=" + opt);
+
 
 // initialize
 serverFiles[opt.head] = '';
@@ -349,9 +355,102 @@ function checkForDirectories(dir0)
     return false;
 }
 
+// return a string of HTML for the index of pages in the
+// dir.
+function getUsersDirIndex()
+{
+    var ret = ""; // returned string of HTML
+
+    var preTable = "\n\n" +
+            "<div style='clear:left;'><div>\n" +
+            '<hr>\n<table class=index>\n' +
+            '  <tr><th colspan=1>User Demo Directories</th></tr>\n';
+
+    var postTable = '</table>\n\n';
+
+    // Now find directories in this directory
+    try {
+        var dirs = fs.readdirSync("/home");
+    }
+    catch(e) {
+        // not able to open as a directory
+        dirs = [];
+    }
+
+
+    for(var i=0; i<dirs.length;++i) {
+        var d = path.join("/home", dirs[i], "public_html/demos");
+        if(checkForDirectories(d)) {
+            if(preTable) {
+                ret += preTable;
+                preTable = false;
+            }
+            var p = "/~" + dirs[i];
+            ret +=
+                '    <tr>' +
+                '<td><a href="' + p + '">' + p + '</a></td>' +
+                '</tr>\n';
+        }
+    }
+
+    if(!preTable)
+        ret += postTable + "\n\n";
+
+    return ret;
+}
+
+
+// return a string of HTML for the index of pages in the
+// dir.
+function getCurrentDirIndex(dir, dirs, relDir, headerDirFull)
+{
+    var ret = ""; // returned string of HTML
+
+    var preTable = "\n\n" +
+            "<div style='clear:left;'><div>\n" +
+            '<hr>\n<table class=index>\n' +
+            '  <tr><th colspan=1>' + dir + ' Directories</th></tr>\n';
+
+    var postTable = '</table>\n<hr>\n';
+
+
+    if(relDir != '/') {
+        var href = path.dirname(relDir);
+        ret += preTable +
+            '  <tr>' +
+            '<td><a href="' + href + '">Parent Directory ..</a></td>' +
+            '</tr>\n';
+        preTable = false;
+    }
+
+    for(var i=0; i<dirs.length;++i) {
+        var d = path.join(dir,dirs[i]);
+        if(d == headerDirFull)
+            // Skip main menu launchers
+            continue;
+        if(checkForDirectories(d)) {
+            if(preTable) {
+                ret += preTable;
+                preTable = false;
+            }
+            var p = path.join(relDir, dirs[i]);
+            ret +=
+                '    <tr>' +
+                '<td><a href="' + p + '">' + p + '</a></td>' +
+                '</tr>\n';
+        }
+    }
+
+    if(!preTable)
+        ret += postTable + "\n";
+
+    return ret;
+}
+
+
 function getPage(dir, relDir) {
 
-    //console.log('CALLING getPage(dir="' + dir + '", relDir="' + relDir + '")');
+    console.log('CALLING getPage(dir="' + dir + '", relDir="' + relDir + '")');
 
     // TODO: This could read head.htm (and foot.htm) each time so
     // that changes go into effect immediately.
@@ -428,19 +527,19 @@ function getPage(dir, relDir) {
 
     page += s;
     s = '';
+
+
+    //////////////////////////////////////////////
+    //
+    //////////////////////////////////////////////
+
+
+    page += getUsersDirIndex();
     
 
     /////////////////////////////////////////////
     // Current directory index 
     /////////////////////////////////////////////
-
- 
-    var preTable =
-            "<div style='clear:left;'><div>\n" +
-            '<hr>\n<table class=index>\n' +
-            '  <tr><th colspan=1>' + dir + ' Directories</th</tr>\n';
-
-    var postTable = '</table>\n<hr>\n';
 
     // Now find directories in this directory
     try {
@@ -451,36 +550,8 @@ function getPage(dir, relDir) {
         dirs = [];
     }
 
+    page += getCurrentDirIndex(dir, dirs, relDir, headerDirFull);
 
-    if(relDir != '/') {
-        var href = path.dirname(relDir);
-        page += preTable +
-            '  <tr>' +
-            '<td><a href="' + href + '">Parent Directory ..</a></td>' +
-            '</tr>\n';
-        preTable = false;
-    }
-
-    for(var i=0; i<dirs.length;++i) {
-        var d = path.join(dir,dirs[i]);
-        if(d == headerDirFull)
-            // Skip main menu launchers
-            continue;
-        if(checkForDirectories(d)) {
-            if(preTable) {
-                page += preTable;
-                preTable = false;
-            }
-            var p = path.join(relDir, dirs[i]);
-            page +=
-                '    <tr>' +
-                '<td><a href="' + p + '">' + p + '</a></td>' +
-                '</tr>\n';
-        }
-    }
-
-    if(!preTable)
-        page += postTable;
 
     /////////////////////////////////////////////
     // Current directory launcher programs
@@ -552,7 +623,7 @@ function config() {
         console.log(
             'Cannot find supporting files in directories: ' +
             etcDirs + "\n\n");
-        process.exit(2);
+        process.exit(2); // fail
     }
 
     for(var i=0; i < filenames.length; ++i)
@@ -562,7 +633,7 @@ function config() {
                 fs.readFileSync(path.join(etcDir, filenames[i]));
         } catch(err) {
             console.log("Error: " + err + "\n\n");
-            process.exit(2);
+            process.exit(2); // fail
         }
     }
     var d = false;
@@ -574,7 +645,7 @@ function config() {
                 {
                     console.log("Failed to make directory: " +
                         opt.config_dir + "\n" + err + "\n\n");
-                    process.exit(1);
+                    process.exit(1); // fail
                 }
         });
         console.log("Made directory: " + opt.config_dir);
@@ -597,6 +668,32 @@ function spewObject(obj, pre) {
     console.log(pre + '= ' + JSON.stringify(obj));
 }
 
+
+// returns a string that is the full path
+// of a file that may be a directory or file.
+function getFullPath(urlPathname)
+{
+    if(urlPathname.substring(0, 2) == "/~") {
+
+        var user = urlPathname.substr(2);
+        var n = user.indexOf("/");
+        if(n !== -1) {
+            var restOfPath = user.substring(n);
+            user = user.substring(0, n);
+        } else {
+            var restOfPath = "";
+            //user = user.substring(0, n);
+        }
+
+        // example:  /~joe/foo/bar => /home/joe/public_html/demos/foo/bar
+
+        return path.join("/home", user, "public_html/demos", restOfPath);
+    }
+
+    return path.join(opt.root_dir, urlPathname);
+}
+
+
 // Server state is what child programs are running: Launchers has unique
 // hash key of the programs servers path relative to the server root.
 //
@@ -608,7 +705,8 @@ function spewObject(obj, pre) {
 function run(relPath, response) {
 
     var launch = getLauncher(relPath);
-    var fullPath = path.join(opt.root_dir, relPath);
+
+    var fullPath = getFullPath(relPath);
     
     console.log('server running: ' + fullPath);
 
@@ -717,7 +815,7 @@ function httpRequest(request, response) {
             " parse.query=" + parse.query +
             " parse.pathname=" + parse.pathname);
 
-    var fpath = path.join(opt.root_dir, parse.pathname);
+    var fpath = getFullPath(parse.pathname);
 
     try {
         var stats = fs.lstatSync(fpath);

@@ -440,13 +440,10 @@ function parseOptions(path) {
 }
 
 
-var path = require('path');
+var opt = parseOptions(require('path'));
 
-var opt = parseOptions(path);
 
-// opt and path are the other two things that
-// are needed a this point
-
+module.exports.opt = opt;
 
 
 //////////////////////////////////////////

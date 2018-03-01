@@ -27,8 +27,7 @@ built_files = $(sort\
  $(built_js_files)\
  $(built_css_files)\
  $(keys)\
- node_modules/ws\
- webLauncher)
+ node_modules/ws)
 
 sep = ////////////////////////////////////////////\n
 
@@ -47,12 +46,6 @@ ETC = $(PREFIX)/etc
 
 build: $(built_files)
 
-# everyone's favorite build tool is cat
-webLauncher: $(webLauncher_sources)
-	echo "$(shabang)" > $@
-	echo "// This is a generated file" >> $@
-	for i in $^ ; do echo "$(sep)// START $$i" >> $@; cat $$i >> $@; done
-	chmod 755 $@
 
 # We npm install a copy of ws
 node_modules/ws:
@@ -81,7 +74,7 @@ mkdirs:
 
 install: mkdirs build
 	cp  -r $(etc_files) $(ETC)/
-	cp webLauncher $(BIN)/
+	cp webLauncher webLauncher.js options.js $(BIN)/
 	cp -r node_modules/ $(BIN)/
 
 clean:
