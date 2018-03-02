@@ -336,19 +336,24 @@ function checkForDirectories(dir0)
             var dir1 = path.join(dir0,f0[i]);
 
             if(fs.lstatSync(dir1).isDirectory()) {
-                var f1 = fs.readdirSync(dir1);
 
-                for(var j=0; j<f1.length; ++j)
-                    if(opt.run_script.test(f1[j]))
+                var f1 = fs.readdirSync(dir1);
+ 
+                for(var j=0; j<f1.length; ++j) {
+
+                    if(opt.run_script.test(f1[j])) {
                         // We found a run script in dir1
                         return true;
+                    }
 
-                if(fs.lstatSync(path.join(dir1,f1[i])).isDirectory())
-                    // We have a directory in a directory in dir0.
-                    return true;
+                    if(fs.lstatSync(path.join(dir1,f1[j])).isDirectory())
+                        // We have a directory in a directory in dir0.
+                        return true;
+                }
             }
         }
     } catch(e) {
+
         return false;
     }
 
@@ -450,7 +455,7 @@ function getCurrentDirIndex(dir, dirs, relDir, headerDirFull)
 
 function getPage(dir, relDir) {
 
-    console.log('CALLING getPage(dir="' + dir + '", relDir="' + relDir + '")');
+    //console.log('CALLING getPage(dir="' + dir + '", relDir="' + relDir + '")');
 
     // TODO: This could read head.htm (and foot.htm) each time so
     // that changes go into effect immediately.
