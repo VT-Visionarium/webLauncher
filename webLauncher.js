@@ -1193,10 +1193,10 @@ if(server)
 // good for the general server URL.
 if(opt.passcode.length < 1)
     console.log(opt.program_name + " service at  => https://" +
-            require('os').hostname() + ":" + opt.https_port);
+            opt.hostname + ":" + opt.https_port);
 else
     console.log(opt.program_name + " service at  => https://" +
-            require('os').hostname() + ":" + opt.https_port +
+            opt.hostname + ":" + opt.https_port +
             '/?passcode=' + opt.passcode);
 
 if(server)

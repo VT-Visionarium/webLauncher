@@ -80,6 +80,12 @@ function parseOptions(path) {
         type: 'bool',
         help: 'print this help.'
     },
+    hostname: {
+        type: 'string',
+        dflt: require('os').hostname(),
+        help: 'just uses the hostname given to print the URL at startup.' +
+            ' This hostname value is only used to print the URL.'
+    },
     http_port: {
         type: 'string', dflt: '8080',
         help: 'set the server HTTP port to HTTP_PORT. ' +
