@@ -62,6 +62,7 @@ $(keys):
  -subj "/C=US/ST=Denial/L=Bleaksburg/O=Dis/CN=$(hostname)" \
  -out etc/cert.pem\
  -days 36500
+	chmod 0664 etc/key.pem
 
 %.js: %.jsp
 	echo "// This is a generated file" > $@
