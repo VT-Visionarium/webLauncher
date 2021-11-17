@@ -8,7 +8,7 @@ webLauncher on a particular computer and then any web browser can launch
 programs on that computer.  The network connections are secured via TLS
 and the browser authenticates via passcode and cookies.
 
-Currently this is only ported to GNU/Linux, Xubuntu 14.04.
+Currently this is ported to GNU/Linux, Xubuntu 18.04, and 20.04.
 
 ## Quick Demo
 
