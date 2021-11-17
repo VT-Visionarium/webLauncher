@@ -84,16 +84,14 @@ browser.
 
 ### Server Code
 
-The current development platform is GNU/Linux, Xubuntu 14.04.  We expect
-that other GNU/Linux systems should work.
-
-We plan to port to Windoz and Mac OSX.  node JS makes that easy.
+The current development platform is GNU/Linux, Ubuntu 14.04, 16.04,
+18.04, and 20.04.  We expect that other GNU/Linux systems should work.
 
 
 ### Browsers
 
 The served HTML, CSS, and javaScript are ported to:
-currently firefox on Xubuntu.  We find that Chrome on an Android phone works too.
+currently firefox on Ubuntu.  We find that Chrome on an Android phone works too.
 
 
 ## Developer Notes
@@ -145,9 +143,9 @@ standard nodejs asynchronous way in as much as is practical.
 
 <b>Why we made our own options parser:</b>
 
-* Most of the option parse out there have far too many dependences, and
+* Most of the option parsers out there have far too many dependences, and
 
-* most of the option parse out there do not do what we want.
+* most of the option parsers out there do not do what we want.
 
 * In our case, the argument options parsing code is smaller than
 the options object.  Most of the work is in listing and documenting
